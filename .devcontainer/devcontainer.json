@@ -1,4 +1,7 @@
 {
   "name": "Elm",
-  "dockerFile": "Dockerfile"
+  "dockerFile": "Dockerfile",
+  "appPort": [
+    8000
+  ]
 }
