@@ -6,6 +6,7 @@ import Html.Attributes exposing (src)
 import Html.Events exposing (onClick)
 
 
+main : Program () Int Msg
 main =
     Browser.sandbox { init = 0, update = update, view = view }
 
@@ -15,6 +16,7 @@ type Msg
     | Decrement
 
 
+update : Msg -> Int -> Int
 update msg model =
     case msg of
         Increment ->
@@ -24,6 +26,7 @@ update msg model =
             model - 1
 
 
+view : Int -> Html Msg
 view model =
     div []
         [ h1 [] [ text "KOM.one" ]
