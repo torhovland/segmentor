@@ -3,5 +3,8 @@
   "dockerFile": "Dockerfile",
   "appPort": [
     8000
+  ],
+  "extensions": [
+    "Elmtooling.elm-ls-vscode"
   ]
 }

@@ -1,2 +1,3 @@
 FROM codesimple/elm:0.19
 RUN apk add --no-cache git
+RUN npm install -g elm-format
