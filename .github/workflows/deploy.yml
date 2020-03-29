@@ -35,6 +35,6 @@ jobs:
       uses: crazy-max/ghaction-github-pages@v1.3.0
       with:
         build_dir: dist
-        fqdn: segmentor.io
+        fqdn: kom.one
       env:
         GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
