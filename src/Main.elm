@@ -1,7 +1,8 @@
 module Main exposing (main)
 
 import Browser
-import Html exposing (Html, button, div, text)
+import Html exposing (Html, button, div, text, h1, img)
+import Html.Attributes exposing (src)
 import Html.Events exposing (onClick)
 
 main =
@@ -19,7 +20,10 @@ update msg model =
 
 view model =
   div []
-    [ button [ onClick Decrement ] [ text "-" ]
+    [ h1 [] [ text "KOM.one" ] 
+    , div [] [ img [ src "images/btn_strava_connectwith_orange.svg" ] [] ]
+    , button [ onClick Decrement ] [ text "-" ]
     , div [] [ text (String.fromInt model) ]
     , button [ onClick Increment ] [ text "+" ]
+    , div [] [ img [ src "images/api_logo_pwrdBy_strava_horiz_light.svg" ] [] ]
     ]
