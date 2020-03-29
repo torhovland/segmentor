@@ -29,6 +29,7 @@ jobs:
         elm-version: 0.19.1
 
     - run: elm make src/Main.elm --output=dist/index.html --optimize
+    - run: cp -r src/images dist/
 
     - name: GitHub Pages
       if: success()
