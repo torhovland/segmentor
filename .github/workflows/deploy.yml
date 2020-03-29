@@ -31,8 +31,10 @@ jobs:
     - run: elm make src/Main.elm --output=dist/index.html --optimize
 
     - name: GitHub Pages
+      if: success()
       uses: crazy-max/ghaction-github-pages@v1.3.0
       with:
         build_dir: dist
         fqdn: segmentor.io
-        
+      env:
+        GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
