@@ -29,7 +29,10 @@ import (
 // [START main_func]
 
 func main() {
-	http.HandleFunc("/", indexHandler)
+	http.HandleFunc("/hello", indexHandler)
+
+	fs := http.FileServer(http.Dir("static/"))
+	http.Handle("/", fs)
 
 	// [START setting_port]
 	port := os.Getenv("PORT")
@@ -51,11 +54,11 @@ func main() {
 
 // indexHandler responds to requests with our greeting.
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
+	if r.URL.Path != "/hello" {
 		http.NotFound(w, r)
 		return
 	}
-	fmt.Fprint(w, "Hello, World!")
+	fmt.Fprint(w, "Hello, Worlds!")
 }
 
 // [END indexHandler]
