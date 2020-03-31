@@ -56,7 +56,7 @@ update msg model =
 
 view : Model -> Browser.Document Msg
 view model =
-    { title = "foo"
+    { title = "KOM.one"
     , body =
         [ h1 [] [ text "KOM.one" ]
         , div [] [ a [ href "https://www.strava.com/oauth/authorize?client_id=" ] [ img [ src "images/btn_strava_connectwith_orange.svg" ] [] ] ]
