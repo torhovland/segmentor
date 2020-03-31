@@ -28,8 +28,7 @@ jobs:
         # Version of Elm to use. E.g. 0.19.1
         elm-version: 0.19.1
 
-    - run: elm make src/Main.elm --output=dist/index.html --optimize
-    - run: cp -r src/images dist/
+    - run: elm make src/Main.elm --output=backend/static/dist/main.js --optimize
 
     - name: GitHub Pages
       if: success()
