@@ -9,6 +9,6 @@ RUN curl -L https://github.com/elm/compiler/releases/download/0.19.1/binary-for-
 RUN chmod +x /usr/local/bin/elm
 ENTRYPOINT ["elm"]
 
-RUN npm install -g elm-format --unsafe-perm=true
+RUN npm install -g elm-format elm-live --unsafe-perm=true
 
 USER $USERNAME
