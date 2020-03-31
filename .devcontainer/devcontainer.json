@@ -2,7 +2,8 @@
   "name": "Elm",
   "dockerFile": "Dockerfile",
   "appPort": [
-    8000
+    8000,
+    8080
   ],
   "extensions": [
     "ms-vscode.go",
