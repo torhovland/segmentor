@@ -5,6 +5,7 @@
     8000
   ],
   "extensions": [
+    "ms-vscode.go",
     "Elmtooling.elm-ls-vscode"
   ]
 }
