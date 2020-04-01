@@ -29,7 +29,7 @@ import (
 // [START main_func]
 
 func main() {
-	http.HandleFunc("/hello", indexHandler)
+	http.HandleFunc("/exchange_token", indexHandler)
 
 	fs := http.FileServer(http.Dir("static/"))
 	http.Handle("/", fs)
@@ -54,7 +54,7 @@ func main() {
 
 // indexHandler responds to requests with our greeting.
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/hello" {
+	if r.URL.Path != "/exchange_token" {
 		http.NotFound(w, r)
 		return
 	}

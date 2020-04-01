@@ -1,7 +1,7 @@
 module Main exposing (main)
 
 import Browser
-import Browser.Navigation
+import Browser.Navigation as Nav
 import Html exposing (Html, a, button, div, h1, img, text)
 import Html.Attributes exposing (href, src)
 import Html.Events exposing (onClick)
@@ -12,11 +12,11 @@ main : Program Flags Model Msg
 main =
     Browser.application
         { init = init
-        , onUrlChange = onUrlChange
-        , onUrlRequest = onUrlRequest
         , subscriptions = subscriptions
         , update = update
         , view = view
+        , onUrlChange = UrlChanged
+        , onUrlRequest = LinkClicked
         }
 
 
@@ -27,7 +27,11 @@ type alias OAuthParameters =
 
 
 type alias Model =
-    { oauth : OAuthParameters, number : Int }
+    { key : Nav.Key
+    , url : Url.Url
+    , oauth : OAuthParameters
+    , number : Int
+    }
 
 
 type alias Flags =
@@ -35,18 +39,33 @@ type alias Flags =
 
 
 type Msg
-    = Increment
+    = LinkClicked Browser.UrlRequest
+    | UrlChanged Url.Url
+    | Increment
     | Decrement
 
 
-init : Flags -> Url.Url -> Browser.Navigation.Key -> ( Model, Cmd Msg )
+init : Flags -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
-    ( { oauth = { clientId = "foo", clientSecret = "bar" }, number = 0 }, Cmd.none )
+    ( Model key url { clientId = "foo", clientSecret = "bar" } 0, Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        LinkClicked urlRequest ->
+            case urlRequest of
+                Browser.Internal url ->
+                    ( model, Nav.pushUrl model.key (Url.toString url) )
+
+                Browser.External href ->
+                    ( model, Nav.load href )
+
+        UrlChanged url ->
+            ( { model | url = url }
+            , Cmd.none
+            )
+
         Increment ->
             ( { model | number = model.number + 1 }, Cmd.none )
 
@@ -59,7 +78,7 @@ view model =
     { title = "KOM.one"
     , body =
         [ h1 [] [ text "KOM.one" ]
-        , div [] [ a [ href "https://www.strava.com/oauth/authorize?client_id=" ] [ img [ src "images/btn_strava_connectwith_orange.svg" ] [] ] ]
+        , div [] [ a [ href "https://www.strava.com/oauth/authorize?client_id=38457&response_type=code&redirect_uri=http://localhost:8080/exchange_token&approval_prompt=force&scope=read,activity:read&state=123" ] [ img [ src "images/btn_strava_connectwith_orange.svg" ] [] ] ]
         , button [ onClick Decrement ] [ text "-" ]
         , div [] [ text (String.fromInt model.number) ]
         , button [ onClick Increment ] [ text "+" ]
@@ -70,11 +89,3 @@ view model =
 
 subscriptions model =
     Sub.none
-
-
-onUrlChange url =
-    Increment
-
-
-onUrlRequest request =
-    Increment
