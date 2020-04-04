@@ -22,6 +22,12 @@ jobs:
     # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
 
+    - name: Write Strava API config file    
+      run: 'echo "$SSH_KEY" > strava_client_secret'
+      shell: bash
+      env:
+        SSH_KEY: ${{secrets.STRAVA_CLIENT_SECRET}}
+
     - name: Setup Elm
       uses: justgook/setup-elm@v1
       with:
