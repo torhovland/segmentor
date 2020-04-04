@@ -2,3 +2,4 @@ node_modules
 elm-stuff
 repl-temp-*
 backend/static/dist
+/backend/strava_client_secret
