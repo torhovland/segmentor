@@ -20,22 +20,16 @@ main =
         }
 
 
-type alias OAuthParameters =
-    { clientId : String
-    , clientSecret : String
-    }
-
-
 type alias Model =
     { key : Nav.Key
     , url : Url.Url
-    , oauth : OAuthParameters
+    , stravaData : Maybe String
     , number : Int
     }
 
 
 type alias Flags =
-    { x : Float, y : Float }
+    { x : Float, y : Float, stravaData : Maybe String }
 
 
 type Msg
@@ -47,7 +41,7 @@ type Msg
 
 init : Flags -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init flags url key =
-    ( Model key url { clientId = "foo", clientSecret = "bar" } 0, Cmd.none )
+    ( Model key url flags.stravaData 0, Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -100,6 +94,7 @@ view model =
     { title = "KOM.one"
     , body =
         [ h1 [] [ text "KOM.one" ]
+        , h1 [] [ text (Maybe.withDefault "no data" model.stravaData) ]
         , div [] [ a [ href ("https://www.strava.com/oauth/authorize?client_id=38457&response_type=code&redirect_uri=" ++ rootUrl model.url ++ "/exchange_token&approval_prompt=force&scope=read,activity:read&state=123") ] [ img [ src "images/btn_strava_connectwith_orange.svg" ] [] ] ]
         , button [ onClick Decrement ] [ text "-" ]
         , div [] [ text (String.fromInt model.number) ]
