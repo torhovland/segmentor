@@ -60,7 +60,7 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer response.Body.Close()
-	body, err := ioutil.ReadAll(response.Body)
+	bytes, err := ioutil.ReadAll(response.Body)
 
 	if err != nil {
 		http.Error(w, "Error when receiving Strava API token.", http.StatusInternalServerError)
@@ -68,11 +68,18 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	body := string(bytes)
+
 	if response.StatusCode >= 400 {
-		http.Error(w, string(body), http.StatusInternalServerError)
+		http.Error(w, body, http.StatusInternalServerError)
 		log.Printf("Error returned from Strava API: %s\n", body)
 		return
 	}
 
 	log.Printf("Response from Strava API: %s\n", body)
+
+	cookie := http.Cookie{Name: "strava_response", Value: body}
+	http.SetCookie(w, &cookie)
+
+	http.Redirect(w, r, "/", 303)
 }
