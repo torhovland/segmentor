@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -36,9 +37,9 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	code := codes[0]
 
-	log.Println("Url parameter 'code' is: " + string(code))
+	log.Println("Url parameter 'code' is: " + code)
 
-	clientSecret, err := ioutil.ReadFile("strava_client_secret")
+	secretBytes, err := ioutil.ReadFile("strava_client_secret")
 
 	if err != nil {
 		http.Error(w, "Strava API is not configured.", http.StatusInternalServerError)
@@ -46,11 +47,12 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println("Using Strava config '" + string(code) + "'")
+	clientSecret := strings.TrimSpace(string(secretBytes))
+	log.Println("Using Strava config '" + clientSecret + "'")
 
 	response, err := http.PostForm("https://www.strava.com/oauth/token", url.Values{
 		"client_id":     {"38457"},
-		"client_secret": {string(clientSecret)},
+		"client_secret": {clientSecret},
 		"code":          {code},
 		"grant_type":    {"authorization_code"},
 	})
@@ -62,7 +64,7 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer response.Body.Close()
-	bytes, err := ioutil.ReadAll(response.Body)
+	bodyBytes, err := ioutil.ReadAll(response.Body)
 
 	if err != nil {
 		http.Error(w, "Error when receiving Strava API token.", http.StatusInternalServerError)
@@ -70,7 +72,7 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body := string(bytes)
+	body := string(bodyBytes)
 
 	if response.StatusCode >= 400 {
 		http.Error(w, body, http.StatusInternalServerError)
