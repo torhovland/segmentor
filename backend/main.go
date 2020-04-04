@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -31,23 +30,32 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 	codes, ok := r.URL.Query()["code"]
 
 	if !ok || len(codes[0]) < 1 {
-		log.Println("Url Param 'code' is missing")
+		http.Error(w, "Url parameter 'code' is missing.", http.StatusBadRequest)
 		return
 	}
 
 	code := codes[0]
 
-	log.Println("Url Param 'code' is: " + string(code))
+	log.Println("Url parameter 'code' is: " + string(code))
+
+	clientSecret, err := ioutil.ReadFile("strava_client_secret")
+
+	if err != nil {
+		http.Error(w, "Strava API is not configured.", http.StatusInternalServerError)
+		log.Printf("Error when reading Strava client secret from file: %s\n", err)
+		return
+	}
 
 	response, err := http.PostForm("https://www.strava.com/oauth/token", url.Values{
 		"client_id":     {"38457"},
-		"client_secret": {"foo"},
+		"client_secret": {string(clientSecret)},
 		"code":          {code},
 		"grant_type":    {"authorization_code"},
 	})
 
 	if err != nil {
-		fmt.Fprintf(w, "Error when requesting Strava token: %s", err)
+		http.Error(w, "Error when requesting Strava API token.", http.StatusInternalServerError)
+		log.Printf("Error when requesting Strava token: %s\n", err)
 		return
 	}
 
@@ -55,13 +63,16 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(response.Body)
 
 	if err != nil {
-		fmt.Fprintf(w, "Error when reading Strava token: %s", err)
+		http.Error(w, "Error when receiving Strava API token.", http.StatusInternalServerError)
+		log.Printf("Error when reading Strava token: %s\n", err)
 		return
 	}
 
-	log.Println(string(body))
-
 	if response.StatusCode >= 400 {
-		fmt.Fprintf(w, "%s", body)
+		http.Error(w, string(body), http.StatusInternalServerError)
+		log.Printf("Error returned from Strava API: %s\n", body)
+		return
 	}
+
+	log.Printf("Response from Strava API: %s\n", body)
 }
