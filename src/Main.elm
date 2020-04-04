@@ -73,12 +73,28 @@ update msg model =
             ( { model | number = model.number - 1 }, Cmd.none )
 
 
+rootUrl : Url.Url -> String
+rootUrl url =
+    let
+        protocol =
+            if url.protocol == Url.Https then
+                "https"
+
+            else
+                "http"
+
+        portNumber =
+            Maybe.withDefault 80 url.port_ |> String.fromInt
+    in
+    protocol ++ "://" ++ url.host ++ ":" ++ portNumber
+
+
 view : Model -> Browser.Document Msg
 view model =
     { title = "KOM.one"
     , body =
         [ h1 [] [ text "KOM.one" ]
-        , div [] [ a [ href "https://www.strava.com/oauth/authorize?client_id=38457&response_type=code&redirect_uri=http://localhost:8080/exchange_token&approval_prompt=force&scope=read,activity:read&state=123" ] [ img [ src "images/btn_strava_connectwith_orange.svg" ] [] ] ]
+        , div [] [ a [ href ("https://www.strava.com/oauth/authorize?client_id=38457&response_type=code&redirect_uri=" ++ rootUrl model.url ++ "/exchange_token&approval_prompt=force&scope=read,activity:read&state=123") ] [ img [ src "images/btn_strava_connectwith_orange.svg" ] [] ] ]
         , button [ onClick Decrement ] [ text "-" ]
         , div [] [ text (String.fromInt model.number) ]
         , button [ onClick Increment ] [ text "+" ]
