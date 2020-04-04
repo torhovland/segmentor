@@ -46,6 +46,8 @@ func tokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	log.Println("Using Strava config '" + string(code) + "'")
+
 	response, err := http.PostForm("https://www.strava.com/oauth/token", url.Values{
 		"client_id":     {"38457"},
 		"client_secret": {string(clientSecret)},
