@@ -1,25 +1,16 @@
-# This is a basic workflow to help you get started with Actions
-
 name: CI
 
-# Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch
 on:
   push:
     branches: [ master ]
   pull_request:
     branches: [ master ]
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
     - uses: actions/checkout@v2
 
     - name: Write Strava API config file    
@@ -31,21 +22,13 @@ jobs:
     - name: Setup Elm
       uses: justgook/setup-elm@v1
       with:
-        # Version of Elm to use. E.g. 0.19.1
         elm-version: 0.19.1
 
-    - run: elm make src/Main.elm --output=backend/static/dist/main.js --optimize
+    - name: Build Elm app
+      run: elm make src/Main.elm --output=backend/static/dist/main.js --optimize
 
-    - name: GitHub Pages
-      if: success()
-      uses: crazy-max/ghaction-github-pages@v1.3.0
-      with:
-        build_dir: backend/static
-        fqdn: kom.one
-      env:
-        GITHUB_PAT: ${{ secrets.GITHUB_PAT }}
-
-    - uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+    - name: Setup Google Cloud Platform
+      uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
       with:
         version: '285.0.0'
         project_id: ${{ secrets.PROJECT_ID }}
@@ -53,8 +36,6 @@ jobs:
         service_account_key: ${{ secrets.GCP_SA_KEY }}
         export_default_credentials: true
 
-    - run: gcloud info
-    
     - name: Publish app to Google App Engine
       run:
         gcloud -q app deploy backend/app.yaml --promote
