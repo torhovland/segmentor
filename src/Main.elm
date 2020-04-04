@@ -77,16 +77,22 @@ rootUrl : Url.Url -> String
 rootUrl url =
     let
         protocol =
-            if url.protocol == Url.Https then
-                "https"
+            case url.protocol of
+                Url.Https ->
+                    "https"
 
-            else
-                "http"
+                Url.Http ->
+                    "http"
 
-        portNumber =
-            Maybe.withDefault 80 url.port_ |> String.fromInt
+        schemeHost =
+            protocol ++ "://" ++ url.host
     in
-    protocol ++ "://" ++ url.host ++ ":" ++ portNumber
+    case url.port_ of
+        Just portNumber ->
+            schemeHost ++ ":" ++ String.fromInt portNumber
+
+        Nothing ->
+            schemeHost
 
 
 view : Model -> Browser.Document Msg
