@@ -38,4 +38,4 @@ jobs:
 
     - name: Publish app to Google App Engine
       run:
-        gcloud -q app deploy backend/app.yaml --promote
+        gcloud -q app deploy backend/app.yaml --promote --verbosity=info
