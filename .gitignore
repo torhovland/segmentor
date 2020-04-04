@@ -3,3 +3,4 @@ elm-stuff
 repl-temp-*
 backend/static/dist
 /backend/strava_client_secret
+/backend/__debug_bin
