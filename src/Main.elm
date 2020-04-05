@@ -5,6 +5,7 @@ import Browser.Navigation as Nav
 import Html exposing (a, button, div, h1, img, text)
 import Html.Attributes exposing (href, src)
 import Html.Events exposing (onClick)
+import Http
 import Json.Decode as Decode
 import Url
 
@@ -32,7 +33,9 @@ type alias StravaAuth =
 type alias Model =
     { key : Nav.Key
     , url : Url.Url
+    , error : String
     , stravaAuth : Maybe (Result Decode.Error StravaAuth)
+    , activities : String
     , number : Int
     }
 
@@ -47,6 +50,7 @@ type alias Flags =
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
+    | GotActivities (Result Http.Error String)
     | Increment
     | Decrement
 
@@ -65,8 +69,43 @@ init flags url key =
     let
         stravaAuth =
             Maybe.map decodeStravaAuth flags.stravaAuth
+
+        cmd =
+            case stravaAuth of
+                Just (Ok auth) ->
+                    Http.request
+                        { method = "GET"
+                        , url = "https://www.strava.com/api/v3/athlete/activities"
+                        , headers = [ Http.header "Authorization" ("Bearer " ++ auth.accessToken) ]
+                        , body = Http.emptyBody
+                        , expect = Http.expectString GotActivities
+                        , timeout = Nothing
+                        , tracker = Nothing
+                        }
+
+                _ ->
+                    Cmd.none
     in
-    ( Model key url stravaAuth 0, Cmd.none )
+    ( Model key url "" stravaAuth "" 0, cmd )
+
+
+errorToString : Http.Error -> String
+errorToString err =
+    case err of
+        Http.Timeout ->
+            "Timeout exceeded"
+
+        Http.NetworkError ->
+            "Network error"
+
+        Http.BadStatus status ->
+            "Bad status from api: " ++ String.fromInt status
+
+        Http.BadBody text ->
+            "Unexpected response from api: " ++ text
+
+        Http.BadUrl url ->
+            "Malformed url: " ++ url
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -81,9 +120,15 @@ update msg model =
                     ( model, Nav.load href )
 
         UrlChanged url ->
-            ( { model | url = url }
-            , Cmd.none
-            )
+            ( { model | url = url }, Cmd.none )
+
+        GotActivities result ->
+            case result of
+                Ok activities ->
+                    ( { model | activities = activities }, Cmd.none )
+
+                Err err ->
+                    ( { model | error = errorToString err }, Cmd.none )
 
         Increment ->
             ( { model | number = model.number + 1 }, Cmd.none )
@@ -147,6 +192,7 @@ view model =
     , body =
         [ h1 [] [ text "KOM.one" ]
         , authBanner model
+        , div [] [ text model.activities ]
         , button [ onClick Decrement ] [ text "-" ]
         , div [] [ text (String.fromInt model.number) ]
         , button [ onClick Increment ] [ text "+" ]
