@@ -38,7 +38,10 @@ type alias Model =
 
 
 type alias Flags =
-    { x : Float, y : Float, stravaAuth : Maybe String }
+    { x : Float
+    , y : Float
+    , stravaAuth : Maybe String
+    }
 
 
 type Msg
@@ -111,10 +114,12 @@ rootUrl url =
             schemeHost
 
 
+loginBanner : Model -> Html.Html msg
 loginBanner model =
     div [] [ a [ href ("https://www.strava.com/oauth/authorize?client_id=38457&response_type=code&redirect_uri=" ++ rootUrl model.url ++ "/exchange_token&approval_prompt=force&scope=read,activity:read&state=123") ] [ img [ src "images/btn_strava_connectwith_orange.svg" ] [] ] ]
 
 
+userBanner : StravaAuth -> Html.Html msg
 userBanner stravaAuth =
     div []
         [ div [] [ text stravaAuth.accessToken ]
@@ -123,6 +128,7 @@ userBanner stravaAuth =
         ]
 
 
+authBanner : Model -> Html.Html msg
 authBanner model =
     case model.stravaAuth of
         Just (Ok data) ->
