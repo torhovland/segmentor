@@ -58,17 +58,17 @@ func main() {
 			return
 		}
 
-		stravaData := string(bodyBytes)
+		stravaAuth := string(bodyBytes)
 
 		if response.StatusCode >= 400 {
-			http.Error(w, stravaData, http.StatusInternalServerError)
-			log.Printf("Error returned from Strava API: %s\n", stravaData)
+			http.Error(w, stravaAuth, http.StatusInternalServerError)
+			log.Printf("Error returned from Strava API: %s\n", stravaAuth)
 			return
 		}
 
-		log.Printf("Response from Strava API: %s\n", stravaData)
+		log.Printf("Response from Strava API: %s\n", stravaAuth)
 
-		indexTemplate.Execute(w, stravaData)
+		indexTemplate.Execute(w, stravaAuth)
 	})
 
 	fs := http.FileServer(http.Dir("static/"))
