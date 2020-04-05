@@ -22,6 +22,11 @@ main =
         }
 
 
+type alias Activity =
+    { name : String
+    }
+
+
 type alias StravaAuth =
     { accessToken : String
     , firstName : String
@@ -35,7 +40,7 @@ type alias Model =
     , url : Url.Url
     , error : String
     , stravaAuth : Maybe (Result Decode.Error StravaAuth)
-    , activities : String
+    , activities : List Activity
     , number : Int
     }
 
@@ -50,9 +55,14 @@ type alias Flags =
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
-    | GotActivities (Result Http.Error String)
+    | GotActivities (Result Http.Error (List Activity))
     | Increment
     | Decrement
+
+
+activityDecoder =
+    Decode.map Activity
+        (Decode.field "name" Decode.string)
 
 
 decodeStravaAuth : String -> Result Decode.Error StravaAuth
@@ -78,7 +88,7 @@ init flags url key =
                         , url = "https://www.strava.com/api/v3/athlete/activities"
                         , headers = [ Http.header "Authorization" ("Bearer " ++ auth.accessToken) ]
                         , body = Http.emptyBody
-                        , expect = Http.expectString GotActivities
+                        , expect = Http.expectJson GotActivities (Decode.list activityDecoder)
                         , timeout = Nothing
                         , tracker = Nothing
                         }
@@ -86,7 +96,7 @@ init flags url key =
                 _ ->
                     Cmd.none
     in
-    ( Model key url "" stravaAuth "" 0, cmd )
+    ( Model key url "" stravaAuth [] 0, cmd )
 
 
 errorToString : Http.Error -> String
@@ -186,13 +196,18 @@ authBanner model =
             loginBanner model
 
 
+activityList : List Activity -> List (Html.Html msg)
+activityList list =
+    List.map (\a -> div [] [ text a.name ]) list
+
+
 view : Model -> Browser.Document Msg
 view model =
     { title = "KOM.one"
     , body =
         [ h1 [] [ text "KOM.one" ]
         , authBanner model
-        , div [] [ text model.activities ]
+        , div [] (activityList model.activities)
         , button [ onClick Decrement ] [ text "-" ]
         , div [] [ text (String.fromInt model.number) ]
         , button [ onClick Increment ] [ text "+" ]
