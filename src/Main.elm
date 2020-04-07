@@ -7,6 +7,8 @@ import Html.Attributes exposing (href, src)
 import Html.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
+import Json.Decode.Extra as Decode
+import Time
 import Url
 
 
@@ -23,7 +25,9 @@ main =
 
 
 type alias Activity =
-    { name : String
+    { id : Int
+    , time : Time.Posix
+    , name : String
     }
 
 
@@ -60,8 +64,11 @@ type Msg
     | Decrement
 
 
+activityDecoder : Decode.Decoder Activity
 activityDecoder =
-    Decode.map Activity
+    Decode.map3 Activity
+        (Decode.field "id" Decode.int)
+        (Decode.field "start_date" Decode.datetime)
         (Decode.field "name" Decode.string)
 
 
@@ -207,6 +214,7 @@ view model =
     , body =
         [ h1 [] [ text "KOM.one" ]
         , authBanner model
+        , div [] [ text model.error ]
         , div [] (activityList model.activities)
         , button [ onClick Decrement ] [ text "-" ]
         , div [] [ text (String.fromInt model.number) ]
