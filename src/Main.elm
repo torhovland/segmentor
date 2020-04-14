@@ -36,8 +36,21 @@ type alias Activity =
     }
 
 
+type alias AccessToken =
+    String
+
+
+type alias PageNumber =
+    Int
+
+
+type Status
+    = Idle
+    | DownloadingActivities
+
+
 type alias StravaAuth =
-    { accessToken : String
+    { accessToken : AccessToken
     , firstName : String
     , lastName : String
     , image : String
@@ -48,8 +61,10 @@ type alias Model =
     { key : Nav.Key
     , url : Url.Url
     , error : String
+    , status : Status
     , stravaAuth : Maybe (Result Decode.Error StravaAuth)
     , activities : List Activity
+    , activityPageNumber : PageNumber
     , number : Int
     }
 
@@ -97,23 +112,28 @@ init flags url key =
         stravaAuth =
             Maybe.map decodeStravaAuth flags.stravaAuth
 
-        cmd =
-            case stravaAuth of
-                Just (Ok auth) ->
-                    Http.request
-                        { method = "GET"
-                        , url = "https://www.strava.com/api/v3/athlete/activities"
-                        , headers = [ Http.header "Authorization" ("Bearer " ++ auth.accessToken) ]
-                        , body = Http.emptyBody
-                        , expect = Http.expectJson GotActivities (Decode.list activityDecoder)
-                        , timeout = Nothing
-                        , tracker = Nothing
-                        }
-
-                _ ->
-                    Cmd.none
+        currentPageNumber =
+            0
     in
-    ( Model key url "" stravaAuth [] 0, cmd )
+    case stravaAuth of
+        Just (Ok auth) ->
+            ( Model key url "" DownloadingActivities stravaAuth [] currentPageNumber 0, getNextActivityPage auth.accessToken currentPageNumber )
+
+        _ ->
+            ( Model key url "" Idle stravaAuth [] currentPageNumber 0, Cmd.none )
+
+
+getNextActivityPage : AccessToken -> PageNumber -> Cmd Msg
+getNextActivityPage accessToken currentPageNumber =
+    Http.request
+        { method = "GET"
+        , url = "https://www.strava.com/api/v3/athlete/activities?per_page=100&page=" ++ String.fromInt (currentPageNumber + 1)
+        , headers = [ Http.header "Authorization" ("Bearer " ++ accessToken) ]
+        , body = Http.emptyBody
+        , expect = Http.expectJson GotActivities (Decode.list activityDecoder)
+        , timeout = Nothing
+        , tracker = Nothing
+        }
 
 
 errorToString : Http.Error -> String
@@ -152,10 +172,19 @@ update msg model =
         GotActivities result ->
             case result of
                 Ok activities ->
-                    ( { model | activities = activities }, Cmd.none )
+                    case model.stravaAuth of
+                        Just (Ok auth) ->
+                            if List.length activities > 0 then
+                                ( { model | activities = model.activities ++ activities, activityPageNumber = model.activityPageNumber + 1 }, getNextActivityPage auth.accessToken model.activityPageNumber )
+
+                            else
+                                ( { model | activityPageNumber = 0, status = Idle }, Cmd.none )
+
+                        _ ->
+                            ( { model | activityPageNumber = 0, status = Idle }, Cmd.none )
 
                 Err err ->
-                    ( { model | error = errorToString err }, Cmd.none )
+                    ( { model | activityPageNumber = 0, status = Idle, error = errorToString err }, Cmd.none )
 
         Increment ->
             ( { model | number = model.number + 1 }, Cmd.none )
@@ -213,6 +242,16 @@ authBanner model =
             loginBanner model
 
 
+statusBanner : Model -> Html.Html msg
+statusBanner model =
+    case model.status of
+        Idle ->
+            div [] []
+
+        DownloadingActivities ->
+            div [] [ text ("Downloading activity page " ++ String.fromInt (model.activityPageNumber + 1)) ]
+
+
 activityList : List Activity -> List (Html.Html msg)
 activityList list =
     List.map (\a -> div [] [ text a.name ]) list
@@ -225,6 +264,7 @@ view model =
         [ h1 [] [ text "KOM.one" ]
         , authBanner model
         , div [] [ text model.error ]
+        , statusBanner model
         , div [] (activityList model.activities)
         , button [ onClick Decrement ] [ text "-" ]
         , div [] [ text (String.fromInt model.number) ]
