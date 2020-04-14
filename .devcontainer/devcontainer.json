@@ -2,5 +2,8 @@
   "name": "Elm",
   "dockerFile": "Dockerfile",
   "appPort": [8080, 8081],
-  "extensions": ["ms-vscode.go", "Elmtooling.elm-ls-vscode"]
+  "extensions": ["ms-vscode.go", "Elmtooling.elm-ls-vscode"],
+  "settings": {
+    "editor.formatOnSave": true
+  }
 }
