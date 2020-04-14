@@ -28,6 +28,11 @@ type alias Activity =
     { id : Int
     , time : Time.Posix
     , name : String
+    , activityType : String
+    , trainer : Bool
+    , commute : Bool
+    , private : Bool
+    , gearId : Maybe String
     }
 
 
@@ -66,10 +71,15 @@ type Msg
 
 activityDecoder : Decode.Decoder Activity
 activityDecoder =
-    Decode.map3 Activity
+    Decode.map8 Activity
         (Decode.field "id" Decode.int)
         (Decode.field "start_date" Decode.datetime)
         (Decode.field "name" Decode.string)
+        (Decode.field "type" Decode.string)
+        (Decode.field "trainer" Decode.bool)
+        (Decode.field "commute" Decode.bool)
+        (Decode.field "private" Decode.bool)
+        (Decode.maybe (Decode.field "gear_id" Decode.string))
 
 
 decodeStravaAuth : String -> Result Decode.Error StravaAuth
