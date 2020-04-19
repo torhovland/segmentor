@@ -2,7 +2,7 @@ module Main exposing (main)
 
 import Browser
 import Browser.Navigation as Nav
-import Cmd.Extra exposing (addCmd, addCmds, withCmd, withCmds, withNoCmd)
+import Cmd.Extra exposing (withCmd, withCmds, withNoCmd)
 import Dict exposing (Dict)
 import Html exposing (Html, a, b, button, div, h1, img, input, p, table, td, text, tr)
 import Html.Attributes exposing (href, src, style, type_, value)
@@ -171,10 +171,10 @@ init flags url key =
     in
     case stravaAuth of
         Just (Ok auth) ->
-            ( { model | status = DownloadingActivities }, getNextActivityPage auth.accessToken currentPageNumber )
+            { model | status = DownloadingActivities } |> withCmd (getNextActivityPage auth.accessToken currentPageNumber)
 
         _ ->
-            ( model, Cmd.none )
+            model |> withNoCmd
 
 
 getNextActivityPage : AccessToken -> PageNumber -> Cmd Msg
@@ -286,7 +286,7 @@ storageHandler response state mdl =
                         Just v ->
                             decodeString v
             in
-            ( { model
+            { model
                 | storageKey = key
                 , value = string
                 , returnLabel =
@@ -296,16 +296,15 @@ storageHandler response state mdl =
 
                         Just lab ->
                             "Just \"" ++ lab ++ "\""
-              }
-            , Cmd.none
-            )
+            }
+                |> withNoCmd
 
         LocalStorage.ListKeysResponse { label, keys } ->
             let
                 keysString =
                     stringListToString keys
             in
-            ( { model
+            { model
                 | keysString = keysString
                 , returnLabel =
                     case label of
@@ -314,12 +313,12 @@ storageHandler response state mdl =
 
                         Just lab ->
                             "Just \"" ++ lab ++ "\""
-              }
-            , Cmd.none
-            )
+            }
+                |> withNoCmd
 
         _ ->
-            ( model, Cmd.none )
+            model
+                |> withNoCmd
 
 
 stringListToString : List String -> String
@@ -347,7 +346,8 @@ update msg model =
                     ( model, Nav.load href )
 
         UrlChanged url ->
-            ( { model | url = url }, Cmd.none )
+            { model | url = url }
+                |> withNoCmd
 
         GotActivities result ->
             case result of
@@ -355,16 +355,20 @@ update msg model =
                     case model.stravaAuth of
                         Just (Ok auth) ->
                             if List.length activities > 0 then
-                                ( { model | activities = model.activities ++ activities, activityPageNumber = model.activityPageNumber + 1 }, Cmd.batch [ getNextActivityPage auth.accessToken model.activityPageNumber, saveActivities model activities ] )
+                                { model | activities = model.activities ++ activities, activityPageNumber = model.activityPageNumber + 1 }
+                                    |> withCmds [ getNextActivityPage auth.accessToken model.activityPageNumber, saveActivities model activities ]
 
                             else
-                                ( { model | activityPageNumber = 0, status = Idle }, Cmd.none )
+                                { model | activityPageNumber = 0, status = Idle }
+                                    |> withNoCmd
 
                         _ ->
-                            ( { model | activityPageNumber = 0, status = Idle }, Cmd.none )
+                            { model | activityPageNumber = 0, status = Idle }
+                                |> withNoCmd
 
                 Err err ->
-                    ( { model | activityPageNumber = 0, status = Idle, error = Just (errorToString err) }, Cmd.none )
+                    { model | activityPageNumber = 0, status = Idle, error = Just (errorToString err) }
+                        |> withNoCmd
 
         SetKey key ->
             { model | storageKey = key } |> withNoCmd
