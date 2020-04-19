@@ -3,10 +3,9 @@ module Main exposing (main)
 import Browser
 import Browser.Navigation as Nav
 import Cmd.Extra exposing (withCmd, withCmds, withNoCmd)
-import Dict exposing (Dict)
-import Html exposing (Html, a, b, button, div, h1, img, input, p, table, td, text, tr)
-import Html.Attributes exposing (href, src, style, type_, value)
-import Html.Events exposing (onClick, onInput)
+import Html exposing (Html, a, button, div, h1, img, text)
+import Html.Attributes exposing (href, src)
+import Html.Events exposing (onClick)
 import Http
 import Json.Decode as Decode
 import Json.Decode.Extra as Decode
@@ -48,10 +47,6 @@ type alias Activity =
     , private : Bool
     , gearId : Maybe String
     }
-
-
-type alias ActivityDict =
-    Dict ActivityId Activity
 
 
 type alias AccessToken =
@@ -106,14 +101,6 @@ type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | GotActivities (Result Http.Error (List Activity))
-    | SetKey String
-    | SetValue String
-    | SetLabel String
-    | GetItem
-    | SetItem
-    | ListKeys
-    | RemoveItem
-    | Clear
     | Process Value
     | Increment
     | Decrement
@@ -370,59 +357,6 @@ update msg model =
                     { model | activityPageNumber = 0, status = Idle, error = Just (errorToString err) }
                         |> withNoCmd
 
-        SetKey key ->
-            { model | storageKey = key } |> withNoCmd
-
-        SetValue value ->
-            { model | value = value } |> withNoCmd
-
-        SetLabel label ->
-            { model | label = label } |> withNoCmd
-
-        GetItem ->
-            let
-                message =
-                    if model.label == "" then
-                        LocalStorage.get model.storageKey
-
-                    else
-                        LocalStorage.getLabeled model.label model.storageKey
-            in
-            { model | returnLabel = "" }
-                |> withCmd (send message model)
-
-        SetItem ->
-            { model | returnLabel = "" }
-                |> withCmd
-                    (send
-                        (LocalStorage.put model.storageKey
-                            (Just <| Encode.string model.value)
-                        )
-                        model
-                    )
-
-        ListKeys ->
-            let
-                message =
-                    if model.label == "" then
-                        LocalStorage.listKeys model.storageKey
-
-                    else
-                        LocalStorage.listKeysLabeled model.label model.storageKey
-            in
-            { model | returnLabel = "" }
-                |> withCmd (send message model)
-
-        RemoveItem ->
-            { model | returnLabel = "" }
-                |> withCmd
-                    (send (LocalStorage.put model.storageKey Nothing) model)
-
-        Clear ->
-            { model | returnLabel = "" }
-                |> withCmd
-                    (send (LocalStorage.clear model.storageKey) model)
-
         Process value ->
             case
                 PortFunnels.processValue funnelDict
@@ -522,11 +456,6 @@ activityList list =
     List.map (\a -> div [] [ text a.name ]) list
 
 
-b : String -> Html msg
-b string =
-    Html.b [] [ text string ]
-
-
 view : Model -> Browser.Document Msg
 view model =
     { title = "KOM.one"
@@ -535,81 +464,6 @@ view model =
         , authBanner model
         , errorBanner model.error
         , statusBanner model
-        , p []
-            [ table []
-                [ tr []
-                    [ td [] [ b "Key: " ]
-                    , td []
-                        [ input
-                            [ value model.storageKey
-                            , onInput SetKey
-                            ]
-                            []
-                        ]
-                    ]
-                , tr []
-                    [ td [] [ b "Value: " ]
-                    , td []
-                        [ input
-                            [ value model.value
-                            , onInput SetValue
-                            ]
-                            []
-                        ]
-                    ]
-                , tr []
-                    [ td [] [ b "Label: " ]
-                    , td []
-                        [ input
-                            [ value model.label
-                            , onInput SetLabel
-                            ]
-                            []
-                        ]
-                    ]
-                , tr []
-                    [ td [] [ b "Return Label: " ]
-                    , td []
-                        [ input
-                            [ value model.returnLabel
-                            , onInput SetLabel
-                            ]
-                            []
-                        ]
-                    ]
-                , tr []
-                    [ td [] [ b "Keys:" ]
-                    , td []
-                        [ text model.keysString ]
-                    ]
-                , tr []
-                    [ td [] [ b "Simulated:" ]
-                    , td []
-                        [ text <|
-                            if model.useSimulator then
-                                "Yes"
-
-                            else
-                                "No"
-                        ]
-                    ]
-                , tr []
-                    [ td [] []
-                    , td []
-                        [ button [ onClick GetItem ]
-                            [ text "Gets" ]
-                        , button [ onClick SetItem ]
-                            [ text "Set" ]
-                        , button [ onClick ListKeys ]
-                            [ text "List" ]
-                        , button [ onClick RemoveItem ]
-                            [ text "Remove" ]
-                        , button [ onClick Clear ]
-                            [ text "Clear" ]
-                        ]
-                    ]
-                ]
-            ]
         , div [] (activityList model.activities)
         , button [ onClick Decrement ] [ text "-" ]
         , div [] [ text (String.fromInt model.number) ]
