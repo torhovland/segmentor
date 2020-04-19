@@ -470,12 +470,12 @@ rootUrl url =
             schemeHost
 
 
-loginBanner : Model -> Html.Html msg
+loginBanner : Model -> Html msg
 loginBanner model =
     div [] [ a [ href ("https://www.strava.com/oauth/authorize?client_id=38457&response_type=code&redirect_uri=" ++ rootUrl model.url ++ "/exchange_token&approval_prompt=force&scope=read,activity:read&state=123") ] [ img [ src "images/btn_strava_connectwith_orange.svg" ] [] ] ]
 
 
-userBanner : StravaAuth -> Html.Html msg
+userBanner : StravaAuth -> Html msg
 userBanner stravaAuth =
     div []
         [ div [] [ text stravaAuth.accessToken ]
@@ -484,7 +484,7 @@ userBanner stravaAuth =
         ]
 
 
-authBanner : Model -> Html.Html msg
+authBanner : Model -> Html msg
 authBanner model =
     case model.stravaAuth of
         Just (Ok data) ->
@@ -497,7 +497,7 @@ authBanner model =
             loginBanner model
 
 
-statusBanner : Model -> Html.Html msg
+statusBanner : Model -> Html msg
 statusBanner model =
     case model.status of
         Idle ->
@@ -507,7 +507,7 @@ statusBanner model =
             div [] [ text ("Downloading activity page " ++ String.fromInt (model.activityPageNumber + 1)) ]
 
 
-errorBanner : Maybe String -> Html.Html msg
+errorBanner : Maybe String -> Html msg
 errorBanner error =
     case error of
         Just err ->
@@ -517,7 +517,7 @@ errorBanner error =
             div [] []
 
 
-activityList : List Activity -> List (Html.Html msg)
+activityList : List Activity -> List (Html msg)
 activityList list =
     List.map (\a -> div [] [ text a.name ]) list
 
