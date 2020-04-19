@@ -6,6 +6,9 @@
     "elm-version": "0.19.1",
     "dependencies": {
         "direct": {
+            "Janiczek/cmd-extra": "1.1.0",
+            "billstclair/elm-localstorage": "7.2.0",
+            "billstclair/elm-port-funnel": "1.2.0",
             "elm/browser": "1.0.2",
             "elm/core": "1.0.5",
             "elm/html": "1.0.0",
@@ -20,6 +23,9 @@
             "elm/file": "1.0.5",
             "elm/parser": "1.1.0",
             "elm/virtual-dom": "1.0.2",
+            "elm-community/dict-extra": "2.4.0",
+            "elm-community/list-extra": "8.2.4",
+            "pzp1997/assoc-list": "1.0.0",
             "rtfeldman/elm-iso8601-date-strings": "1.1.3"
         }
     },

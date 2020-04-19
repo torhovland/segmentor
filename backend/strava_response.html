@@ -6,6 +6,8 @@
 	<title>Main</title>
 	<link rel="stylesheet" href="whatever-you-want.css">
 	<script src="dist/main.js"></script>
+	<script type='text/javascript' src='js/PortFunnel.js'></script>
+	<script type='text/javascript' src='js/PortFunnel/LocalStorage.js'></script>
 </head>
 
 <body>
@@ -20,6 +22,8 @@
 				stravaAuth: "{{.}}"
 			}
 		});
+
+		PortFunnel.subscribe(app);
 	</script>
 </body>
 
