@@ -1,5 +1,7 @@
 module Main exposing (main)
 
+import AccessToken exposing (AccessToken(..))
+import Activity exposing (Activity)
 import Browser
 import Browser.Navigation as Nav
 import Cmd.Extra exposing (withCmd, withCmds, withNoCmd)
@@ -10,14 +12,13 @@ import Http
 import Json.Decode as Decode
 import Json.Decode.Extra as Decode
 import Json.Encode as Encode exposing (Value)
-import Json.Encode.Extra as Encode
+import PageNumber exposing (PageNumber)
 import PortFunnel.LocalStorage as LocalStorage
     exposing
         ( Message
         , Response(..)
         )
 import PortFunnels exposing (FunnelDict, Handler(..))
-import Time
 import Url
 
 
@@ -31,30 +32,6 @@ main =
         , onUrlChange = UrlChanged
         , onUrlRequest = LinkClicked
         }
-
-
-type alias ActivityId =
-    Int
-
-
-type alias Activity =
-    { id : ActivityId
-    , time : Time.Posix
-    , name : String
-    , activityType : String
-    , trainer : Bool
-    , commute : Bool
-    , private : Bool
-    , gearId : Maybe String
-    }
-
-
-type alias AccessToken =
-    String
-
-
-type alias PageNumber =
-    Int
 
 
 type Status
@@ -101,28 +78,15 @@ type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | GotActivities (Result Http.Error (List Activity))
-    | Process Value
+    | Process Encode.Value
     | Increment
     | Decrement
-
-
-activityDecoder : Decode.Decoder Activity
-activityDecoder =
-    Decode.map8 Activity
-        (Decode.field "id" Decode.int)
-        (Decode.field "start_date" Decode.datetime)
-        (Decode.field "name" Decode.string)
-        (Decode.field "type" Decode.string)
-        (Decode.field "trainer" Decode.bool)
-        (Decode.field "commute" Decode.bool)
-        (Decode.field "private" Decode.bool)
-        (Decode.maybe (Decode.field "gear_id" Decode.string))
 
 
 decodeStravaAuth : String -> Result Decode.Error StravaAuth
 decodeStravaAuth json =
     Result.map4 StravaAuth
-        (Decode.decodeString (Decode.field "access_token" Decode.string) json)
+        (Decode.decodeString (Decode.field "access_token" Decode.string |> Decode.map AccessToken) json)
         (Decode.decodeString (Decode.at [ "athlete", "firstname" ] Decode.string) json)
         (Decode.decodeString (Decode.at [ "athlete", "lastname" ] Decode.string) json)
         (Decode.decodeString (Decode.at [ "athlete", "profile" ] Decode.string) json)
@@ -135,7 +99,7 @@ init flags url key =
             Maybe.map decodeStravaAuth flags.stravaAuth
 
         currentPageNumber =
-            0
+            PageNumber.FirstPage
 
         model =
             { key = key
@@ -165,13 +129,13 @@ init flags url key =
 
 
 getNextActivityPage : AccessToken -> PageNumber -> Cmd Msg
-getNextActivityPage accessToken currentPageNumber =
+getNextActivityPage (AccessToken accessToken) currentPageNumber =
     Http.request
         { method = "GET"
-        , url = "https://www.strava.com/api/v3/athlete/activities?per_page=100&page=" ++ String.fromInt (currentPageNumber + 1)
+        , url = "https://www.strava.com/api/v3/athlete/activities?per_page=100&page=" ++ (currentPageNumber |> PageNumber.nextPage |> PageNumber.toString)
         , headers = [ Http.header "Authorization" ("Bearer " ++ accessToken) ]
         , body = Http.emptyBody
-        , expect = Http.expectJson GotActivities (Decode.list activityDecoder)
+        , expect = Http.expectJson GotActivities (Decode.list Activity.decoder)
         , timeout = Nothing
         , tracker = Nothing
         }
@@ -220,7 +184,7 @@ decodeString value =
 
 storageKey : Activity -> String
 storageKey activity =
-    "a" ++ String.fromInt activity.id
+    "a" ++ Activity.toString activity.id
 
 
 saveActivity : Model -> Activity -> Cmd Msg
@@ -228,11 +192,7 @@ saveActivity model activity =
     send
         (LocalStorage.put (storageKey activity)
             (Just <|
-                Encode.object
-                    [ ( "id", Encode.int activity.id )
-                    , ( "name", Encode.string activity.name )
-                    , ( "time", Encode.int (Time.posixToMillis activity.time) )
-                    ]
+                Activity.encode activity
             )
         )
         model
@@ -342,19 +302,19 @@ update msg model =
                     case model.stravaAuth of
                         Just (Ok auth) ->
                             if List.length activities > 0 then
-                                { model | activities = model.activities ++ activities, activityPageNumber = model.activityPageNumber + 1 }
+                                { model | activities = model.activities ++ activities, activityPageNumber = PageNumber.nextPage model.activityPageNumber }
                                     |> withCmds [ getNextActivityPage auth.accessToken model.activityPageNumber, saveActivities model activities ]
 
                             else
-                                { model | activityPageNumber = 0, status = Idle }
+                                { model | activityPageNumber = PageNumber.FirstPage, status = Idle }
                                     |> withNoCmd
 
                         _ ->
-                            { model | activityPageNumber = 0, status = Idle }
+                            { model | activityPageNumber = PageNumber.FirstPage, status = Idle }
                                 |> withNoCmd
 
                 Err err ->
-                    { model | activityPageNumber = 0, status = Idle, error = Just (errorToString err) }
+                    { model | activityPageNumber = PageNumber.FirstPage, status = Idle, error = Just (errorToString err) }
                         |> withNoCmd
 
         Process value ->
@@ -412,7 +372,7 @@ loginBanner model =
 userBanner : StravaAuth -> Html msg
 userBanner stravaAuth =
     div []
-        [ div [] [ text stravaAuth.accessToken ]
+        [ div [] [ stravaAuth.accessToken |> AccessToken.toString |> text ]
         , div [] [ text (stravaAuth.firstName ++ " " ++ stravaAuth.lastName) ]
         , div [] [ img [ src stravaAuth.image ] [] ]
         ]
@@ -438,7 +398,7 @@ statusBanner model =
             div [] []
 
         DownloadingActivities ->
-            div [] [ text ("Downloading activity page " ++ String.fromInt (model.activityPageNumber + 1)) ]
+            div [] [ text ("Downloading activity page " ++ (model.activityPageNumber |> PageNumber.nextPage |> PageNumber.toString)) ]
 
 
 errorBanner : Maybe String -> Html msg
