@@ -66,7 +66,7 @@ ENV GO111MODULE=auto
 # Elm
 RUN curl -L https://github.com/elm/compiler/releases/download/0.19.1/binary-for-linux-64-bit.gz | gunzip -c >/usr/local/bin/elm
 RUN chmod +x /usr/local/bin/elm
-RUN npm install -g elm-format elm-live --unsafe-perm=true
+RUN npm install -g elm-format elm-live elm-test --unsafe-perm=true
 ENTRYPOINT ["elm"]
 
 USER $USERNAME

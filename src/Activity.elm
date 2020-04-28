@@ -1,4 +1,4 @@
-module Activity exposing (Activity, ActivityId, decoder, encode, toString)
+module Activity exposing (Activity, ActivityId(..), decoder, encode, toString)
 
 import Json.Decode as Decode
 import Json.Decode.Extra as Decode
