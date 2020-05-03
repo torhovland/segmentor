@@ -10,7 +10,7 @@ nextPage : PageNumber -> PageNumber
 nextPage pageNumber =
     case pageNumber of
         FirstPage ->
-            PageNumber 1
+            PageNumber 2
 
         PageNumber a ->
             PageNumber <| a + 1
@@ -20,7 +20,7 @@ toString : PageNumber -> String
 toString pageNumber =
     case pageNumber of
         FirstPage ->
-            "0"
+            "1"
 
         PageNumber a ->
             String.fromInt a

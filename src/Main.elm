@@ -19,6 +19,7 @@ import PortFunnel.LocalStorage as LocalStorage
         , Response(..)
         )
 import PortFunnels exposing (FunnelDict, Handler(..))
+import Status exposing (Status)
 import Url
 
 
@@ -32,11 +33,6 @@ main =
         , onUrlChange = UrlChanged
         , onUrlRequest = LinkClicked
         }
-
-
-type Status
-    = Idle
-    | DownloadingActivities
 
 
 type alias StravaAuth =
@@ -62,7 +58,6 @@ type alias Model =
     , status : Status
     , stravaAuth : Maybe (Result Decode.Error StravaAuth)
     , activities : List Activity
-    , activityPageNumber : PageNumber
     , number : Int
     }
 
@@ -98,9 +93,6 @@ init flags url key =
         stravaAuth =
             Maybe.map decodeStravaAuth flags.stravaAuth
 
-        currentPageNumber =
-            PageNumber.FirstPage
-
         model =
             { key = key
             , storageKey = "key"
@@ -113,26 +105,34 @@ init flags url key =
             , wasLoaded = False
             , funnelState = PortFunnels.initialState "example"
             , error = Nothing
-            , status = Idle
+            , status = Status.Idle
             , stravaAuth = stravaAuth
             , activities = []
-            , activityPageNumber = currentPageNumber
             , number = 0
             }
     in
     case stravaAuth of
         Just (Ok auth) ->
-            { model | status = DownloadingActivities } |> withCmd (getNextActivityPage auth.accessToken currentPageNumber)
+            { model | status = Status.DownloadingActivities PageNumber.FirstPage } |> withCmd (getNextActivityPage auth.accessToken model.status)
 
         _ ->
             model |> withNoCmd
 
 
-getNextActivityPage : AccessToken -> PageNumber -> Cmd Msg
-getNextActivityPage (AccessToken accessToken) currentPageNumber =
+getNextActivityPage : AccessToken -> Status -> Cmd Msg
+getNextActivityPage (AccessToken accessToken) status =
+    let
+        pageNumber =
+            case status of
+                Status.DownloadingActivities currentPageNumber ->
+                    currentPageNumber |> PageNumber.nextPage
+
+                _ ->
+                    PageNumber.FirstPage
+    in
     Http.request
         { method = "GET"
-        , url = "https://www.strava.com/api/v3/athlete/activities?per_page=100&page=" ++ (currentPageNumber |> PageNumber.nextPage |> PageNumber.toString)
+        , url = "https://www.strava.com/api/v3/athlete/activities?per_page=100&page=" ++ (pageNumber |> PageNumber.toString)
         , headers = [ Http.header "Authorization" ("Bearer " ++ accessToken) ]
         , body = Http.emptyBody
         , expect = Http.expectJson GotActivities (Decode.list Activity.decoder)
@@ -302,19 +302,19 @@ update msg model =
                     case model.stravaAuth of
                         Just (Ok auth) ->
                             if List.length activities > 0 then
-                                { model | activities = model.activities ++ activities, activityPageNumber = PageNumber.nextPage model.activityPageNumber }
-                                    |> withCmds [ getNextActivityPage auth.accessToken model.activityPageNumber, saveActivities model activities ]
+                                { model | activities = model.activities ++ activities, status = Status.nextPage model.status }
+                                    |> withCmds [ getNextActivityPage auth.accessToken model.status, saveActivities model activities ]
 
                             else
-                                { model | activityPageNumber = PageNumber.FirstPage, status = Idle }
+                                { model | status = Status.Idle }
                                     |> withNoCmd
 
                         _ ->
-                            { model | activityPageNumber = PageNumber.FirstPage, status = Idle }
+                            { model | status = Status.Idle }
                                 |> withNoCmd
 
                 Err err ->
-                    { model | activityPageNumber = PageNumber.FirstPage, status = Idle, error = Just (errorToString err) }
+                    { model | status = Status.Idle, error = Just (errorToString err) }
                         |> withNoCmd
 
         Process value ->
@@ -394,11 +394,11 @@ authBanner model =
 statusBanner : Model -> Html msg
 statusBanner model =
     case model.status of
-        Idle ->
+        Status.Idle ->
             div [] []
 
-        DownloadingActivities ->
-            div [] [ text ("Downloading activity page " ++ (model.activityPageNumber |> PageNumber.nextPage |> PageNumber.toString)) ]
+        Status.DownloadingActivities pageNumber ->
+            div [] [ text ("Downloading activity page " ++ (pageNumber |> PageNumber.toString)) ]
 
 
 errorBanner : Maybe String -> Html msg
