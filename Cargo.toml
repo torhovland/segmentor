@@ -6,3 +6,5 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+strava = { git = "https://github.com/torhovland/strava-rs" }
+tokio = { version = "1.16.1", features = ["macros", "rt-multi-thread"] }
