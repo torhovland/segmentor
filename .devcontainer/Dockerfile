@@ -6,6 +6,10 @@ ARG UPGRADE_PACKAGES="false"
 ARG USERNAME=vscode
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
+
+ENV CARGO_HOME=/home/vscode/.cargo
+ENV RUSTUP_HOME=/home/vscode/.rustup
+
 COPY library-scripts/*.sh library-scripts/*.env /tmp/library-scripts/
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     # Remove imagemagick due to https://security-tracker.debian.org/tracker/CVE-2019-10131
@@ -16,6 +20,5 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
 
 RUN apt-get update \
     && apt-get install -y libssl-dev pkg-config \
+    && rustup default stable \
     && cargo install cargo-edit
-
-ENV CARGO_HOME=/home/vscode/.cargo
