@@ -7,5 +7,7 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.53"
+oauth2 = "4.1.0"
+rocket = "0.5.0-rc.1"
 strava = { git = "https://github.com/torhovland/strava-rs" }
 tokio = { version = "1.16.1", features = ["macros", "rt-multi-thread"] }
