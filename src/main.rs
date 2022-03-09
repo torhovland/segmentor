@@ -80,7 +80,10 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
-use tower_http::{services::ServeDir, trace::TraceLayer};
+use tower_http::{
+    services::{ServeDir, ServeFile},
+    trace::TraceLayer,
+};
 
 #[tokio::main]
 async fn main() {
@@ -89,10 +92,18 @@ async fn main() {
 
     // build our application with a route
     let app = Router::new()
-        // `GET /` goes to `root`
-        .route("/", get(root))
-        // `POST /users` goes to `create_user`
-        .route("/users", post(create_user))
+        .route(
+            "/",
+            get_service(ServeFile::new("index.html")).handle_error(
+                |error: std::io::Error| async move {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Unhandled internal error: {}", error),
+                    )
+                },
+            ),
+        )
+        .layer(TraceLayer::new_for_http())
         .nest(
             "/static",
             get_service(ServeDir::new("static")).handle_error(|error: std::io::Error| async move {
@@ -102,7 +113,11 @@ async fn main() {
                 )
             }),
         )
-        .layer(TraceLayer::new_for_http());
+        .layer(TraceLayer::new_for_http())
+        // `GET /` goes to `root`
+        .route("/foo", get(root))
+        // `POST /users` goes to `create_user`
+        .route("/users", post(create_user));
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
