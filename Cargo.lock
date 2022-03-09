@@ -1075,7 +1075,7 @@ checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
 [[package]]
 name = "strava"
 version = "0.2.0"
-source = "git+https://github.com/torhovland/strava-rs#0265624fb07c1ac6cc7857dc3b32463600ef4f7b"
+source = "git+https://github.com/torhovland/strava-rs#92754623ef4c06862d87f5310a110d1fd9158ab3"
 dependencies = [
  "http",
  "reqwest",
