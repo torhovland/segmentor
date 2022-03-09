@@ -19,8 +19,11 @@ RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \
     && apt-get clean -y && rm -rf /var/lib/apt/lists/* /tmp/library-scripts
 
 RUN apt-get update \
-    && apt-get install -y git libssl-dev pkg-config \
+    && apt-get install -y apt-transport-https ca-certificates curl git gnupg libssl-dev pkg-config \
     && rustup default stable \
     && rustup component add clippy \
     && rustup component add rustfmt \
     && cargo install cargo-edit
+
+# Install gcloud
+RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-cli main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg  add - && apt-get update -y && apt-get install google-cloud-cli -y
