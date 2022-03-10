@@ -16,5 +16,8 @@ FROM gcr.io/distroless/cc-debian10
 ARG SERVICE_NAME=segmentor
 
 COPY --from=builder /usr/src/${SERVICE_NAME}/target/release/${SERVICE_NAME} /usr/local/bin/${SERVICE_NAME}
+COPY --from=builder /usr/src/${SERVICE_NAME}/static /usr/src/${SERVICE_NAME}/static
+
+EXPOSE 8088
 
 CMD ["segmentor"]

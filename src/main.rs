@@ -84,17 +84,26 @@ use tower_http::{
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
 };
+use tracing::{debug, info, Level};
+use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
 async fn main() {
     // initialize tracing
-    tracing_subscriber::fmt::init();
+    let subscriber = FmtSubscriber::builder()
+        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
+        // will be written to stdout.
+        .with_max_level(Level::TRACE)
+        // completes the builder.
+        .finish();
+
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     // build our application with a route
     let app = Router::new()
         .route(
             "/",
-            get_service(ServeFile::new("index.html")).handle_error(
+            get_service(ServeFile::new("/usr/src/segmentor/static/index.html")).handle_error(
                 |error: std::io::Error| async move {
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
@@ -106,12 +115,14 @@ async fn main() {
         .layer(TraceLayer::new_for_http())
         .nest(
             "/static",
-            get_service(ServeDir::new("static")).handle_error(|error: std::io::Error| async move {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Unhandled internal error: {}", error),
-                )
-            }),
+            get_service(ServeDir::new("/usr/src/segmentor/static")).handle_error(
+                |error: std::io::Error| async move {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Unhandled internal error: {}", error),
+                    )
+                },
+            ),
         )
         .layer(TraceLayer::new_for_http())
         // `GET /` goes to `root`
@@ -121,12 +132,15 @@ async fn main() {
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-    tracing::debug!("listening on {}", addr);
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8088));
+    println!("a");
+    debug!("listening on {}", addr);
+    println!("b");
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
+    println!("c");
 }
 
 // basic handler that responds with a static string
