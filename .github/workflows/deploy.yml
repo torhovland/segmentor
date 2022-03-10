@@ -26,4 +26,4 @@ jobs:
         run: docker push $IMAGE_NAME
 
       - name: Deploy Docker image
-        run: gcloud run deploy segmentor-340421 --image $IMAGE_NAME --region europe-north1 --platform managed
+        run: gcloud run deploy segmentor-340421 --image $IMAGE_NAME --region europe-north1 --platform managed --port 3000
