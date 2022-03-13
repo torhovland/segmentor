@@ -74,11 +74,16 @@ extern crate strava;
 
 use axum::{
     http::StatusCode,
-    response::IntoResponse,
+    response::{IntoResponse, Redirect, Response},
     routing::{get, get_service, post},
     Json, Router,
 };
+use oauth2::{
+    basic::BasicClient, url::ParseError, AuthUrl, ClientId, ClientSecret, CsrfToken,
+    PkceCodeChallenge, RedirectUrl, Scope, TokenUrl,
+};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::{env, net::SocketAddr};
 use tower_http::{
     services::{ServeDir, ServeFile},
@@ -133,9 +138,8 @@ async fn main() {
             ),
         )
         .layer(TraceLayer::new_for_http())
-        // `GET /` goes to `root`
-        .route("/foo", get(root))
-        // `POST /users` goes to `create_user`
+        .route("/callback", get(callback))
+        .route("/login", get(login))
         .route("/users", post(create_user));
 
     // run our app with hyper
@@ -148,9 +152,46 @@ async fn main() {
         .unwrap();
 }
 
-// basic handler that responds with a static string
-async fn root() -> &'static str {
+async fn callback() -> &'static str {
     "Hello, World!"
+}
+
+async fn login() -> Result<Redirect, AppError> {
+    let environment = get_environment();
+
+    let redirect_url = match environment {
+        Environment::Development => "http://localhost:8088/callback",
+        Environment::Production => "https://segmentor.hovland.xyz/callback",
+        _ => panic!("Undefined environment"),
+    };
+
+    let client = BasicClient::new(
+        ClientId::new("38457".to_string()),
+        Some(ClientSecret::new(
+            "1fb09e3b762ba505e6ff0922c04ab2e0ff8bafb3".to_string(),
+        )),
+        AuthUrl::new("https://www.strava.com/oauth/authorize".to_string())?,
+        Some(TokenUrl::new(
+            "https://www.strava.com/oauth/token".to_string(),
+        )?),
+    )
+    .set_redirect_uri(RedirectUrl::new(redirect_url.to_string())?);
+
+    let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
+
+    let (auth_url, csrf_token) = client
+        .authorize_url(CsrfToken::new_random)
+        // Set the desired scopes.
+        .add_scope(Scope::new("read".to_string()))
+        // Set the PKCE code challenge.
+        .set_pkce_challenge(pkce_challenge)
+        .url();
+
+    Ok(Redirect::permanent(to_axum_url(auth_url)))
+}
+
+fn to_axum_url(url: oauth2::url::Url) -> axum::http::Uri {
+    url.to_string().parse().unwrap()
 }
 
 async fn create_user(
@@ -180,6 +221,48 @@ struct CreateUser {
 struct User {
     id: u64,
     username: String,
+}
+
+enum AppError {
+    /// Something went wrong when calling the user repo.
+    UserRepo(UserRepoError),
+    OAuthParse(ParseError),
+}
+
+#[derive(Debug)]
+enum UserRepoError {
+    #[allow(dead_code)]
+    NotFound,
+    #[allow(dead_code)]
+    InvalidUsername,
+}
+
+impl From<ParseError> for AppError {
+    fn from(inner: ParseError) -> Self {
+        AppError::OAuthParse(inner)
+    }
+}
+
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        let (status, error_message) = match self {
+            AppError::UserRepo(UserRepoError::NotFound) => {
+                (StatusCode::NOT_FOUND, "User not found")
+            }
+            AppError::UserRepo(UserRepoError::InvalidUsername) => {
+                (StatusCode::UNPROCESSABLE_ENTITY, "Invalid username")
+            }
+            AppError::OAuthParse(err) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "OAuth2 parsing failure")
+            }
+        };
+
+        let body = Json(json!({
+            "error": error_message,
+        }));
+
+        (status, body).into_response()
+    }
 }
 
 fn get_environment() -> Environment {
