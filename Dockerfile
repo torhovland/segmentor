@@ -2,6 +2,8 @@ FROM rust:1.58-slim as builder
 
 ARG SERVICE_NAME=segmentor
 
+ENV ENVIRONMENT=production
+
 RUN apt-get update \
     && apt-get install -y libssl-dev pkg-config
 

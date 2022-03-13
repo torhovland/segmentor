@@ -9,6 +9,7 @@ ARG UPGRADE_PACKAGES="false"
 
 # ENV CARGO_HOME=/home/vscode/.cargo
 # ENV RUSTUP_HOME=/home/vscode/.rustup
+ENV ENVIRONMENT=development
 
 COPY library-scripts/*.sh library-scripts/*.env /tmp/library-scripts/
 RUN apt-get update && export DEBIAN_FRONTEND=noninteractive \

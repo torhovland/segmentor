@@ -79,12 +79,12 @@ use axum::{
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
+use std::{env, net::SocketAddr};
 use tower_http::{
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
 };
-use tracing::{debug, info, Level};
+use tracing::{debug, Level};
 use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
@@ -99,11 +99,19 @@ async fn main() {
 
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
+    let environment = get_environment();
+
+    let static_path = match environment {
+        Environment::Development => "/workspaces/segmentor/static/",
+        Environment::Production => "/usr/src/segmentor/static/",
+        _ => panic!("Undefined environment"),
+    };
+
     // build our application with a route
     let app = Router::new()
         .route(
             "/",
-            get_service(ServeFile::new("/usr/src/segmentor/static/index.html")).handle_error(
+            get_service(ServeFile::new(format!("{static_path}index.html"))).handle_error(
                 |error: std::io::Error| async move {
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
@@ -115,7 +123,7 @@ async fn main() {
         .layer(TraceLayer::new_for_http())
         .nest(
             "/static",
-            get_service(ServeDir::new("/usr/src/segmentor/static")).handle_error(
+            get_service(ServeDir::new(static_path)).handle_error(
                 |error: std::io::Error| async move {
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
@@ -133,14 +141,11 @@ async fn main() {
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
     let addr = SocketAddr::from(([0, 0, 0, 0], 8088));
-    println!("a");
     debug!("listening on {}", addr);
-    println!("b");
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
         .unwrap();
-    println!("c");
 }
 
 // basic handler that responds with a static string
@@ -175,4 +180,21 @@ struct CreateUser {
 struct User {
     id: u64,
     username: String,
+}
+
+fn get_environment() -> Environment {
+    match env::var("ENVIRONMENT")
+        .unwrap_or_else(|_| "".into())
+        .as_str()
+    {
+        "development" => Environment::Development,
+        "production" => Environment::Production,
+        _ => Environment::Undefined,
+    }
+}
+
+enum Environment {
+    Development,
+    Production,
+    Undefined,
 }
