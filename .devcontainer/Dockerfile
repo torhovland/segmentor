@@ -24,4 +24,4 @@ RUN apt-get update \
     && rustup default stable \
     && rustup component add clippy \
     && rustup component add rustfmt \
-    && cargo install cargo-edit
+    && cargo install cargo-edit cargo-watch
