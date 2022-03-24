@@ -87,6 +87,7 @@ use oauth2::{
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{env, net::SocketAddr, sync::Arc};
+use strava::athletes::Athlete;
 use tower_http::{
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
@@ -96,6 +97,14 @@ use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 struct State {
     environment: Environment,
+}
+
+#[derive(Debug, Deserialize)]
+struct StravaAuth {
+    access_token: String,
+    athlete: Athlete,
+    expires_at: usize,
+    refresh_token: String,
 }
 
 #[tokio::main]
@@ -178,7 +187,6 @@ async fn callback(Extension(state): Extension<Arc<State>>, auth: Query<AuthParam
     ];
     let token_result = client
         .post("https://www.strava.com/oauth/token")
-        .body("the exact body that is sent")
         .form(&params)
         .send()
         .await;
@@ -192,8 +200,17 @@ async fn callback(Extension(state): Extension<Arc<State>>, auth: Query<AuthParam
 
     match token_result {
         Ok(response) => {
-            let body = response.text().await.unwrap();
-            format!("{:?}", body)
+            // let body = response.json::<StravaAuth>().await.unwrap();
+            let data = response.json::<StravaAuth>().await;
+
+            match data {
+                Ok(json) => {
+                    format!("{:?}", json)
+                }
+                Err(error) => {
+                    format!("{:?}", error)
+                }
+            }
         }
         Err(error) => format!("{:?}", error),
     }
