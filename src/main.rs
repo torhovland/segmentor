@@ -88,6 +88,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{env, net::SocketAddr, sync::Arc};
 use strava::athletes::Athlete;
+use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
 use tower_http::{
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
@@ -155,7 +156,8 @@ async fn main() {
         .route("/callback", get(callback))
         .route("/login", get(login))
         .route("/users", post(create_user))
-        .layer(Extension(shared_state));
+        .layer(Extension(shared_state))
+        .layer(CookieManagerLayer::new());
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
@@ -174,7 +176,11 @@ struct AuthParams {
     scope: String,
 }
 
-async fn callback(Extension(state): Extension<Arc<State>>, auth: Query<AuthParams>) -> String {
+async fn callback(
+    Extension(state): Extension<Arc<State>>,
+    auth: Query<AuthParams>,
+    cookies: Cookies,
+) -> String {
     let oauth_state = auth.state.as_str();
     let code = auth.code.as_str();
     let scope = auth.scope.as_str();
@@ -205,6 +211,14 @@ async fn callback(Extension(state): Extension<Arc<State>>, auth: Query<AuthParam
 
             match data {
                 Ok(json) => {
+                    cookies.add(Cookie::new(
+                        "segmentor-access-token",
+                        json.access_token.clone(),
+                    ));
+                    cookies.add(Cookie::new(
+                        "segmentor-refresh-token",
+                        json.refresh_token.clone(),
+                    ));
                     format!("{:?}", json)
                 }
                 Err(error) => {
