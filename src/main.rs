@@ -1,87 +1,15 @@
 extern crate strava;
 
-// use anyhow::{Context, Result};
-// use oauth2::basic::BasicClient;
-// use oauth2::reqwest::async_http_client;
-// use oauth2::{AuthUrl, ClientId, ClientSecret, Scope, TokenUrl};
-// use std::path::Path;
-// use std::{env, fs};
-// use strava::activities::Activity;
-// use strava::api::AccessToken;
-// use strava::athletes::Athlete;
-
-// #[macro_use]
-// extern crate rocket;
-
-// #[get("/")]
-// fn index() -> &'static str {
-//     "Hello, world!"
-// }
-
-// #[launch]
-// fn rocket() -> _ {
-//     rocket::build().mount("/", routes![index])
-// }
-
-// #[tokio::main]
-// async fn main() -> Result<()> {
-//     let client = BasicClient::new(
-//         ClientId::new("38457".to_string()),
-//         Some(ClientSecret::new(
-//             "1fb09e3b762ba505e6ff0922c04ab2e0ff8bafb3".to_string(),
-//         )),
-//         AuthUrl::new("http://authorize".to_string())?,
-//         Some(TokenUrl::new(
-//             "https://www.strava.com/oauth/token".to_string(),
-//         )?),
-//     );
-
-//     let _token_result = client
-//         .exchange_client_credentials()
-//         .add_scope(Scope::new("read".to_string()))
-//         .request_async(async_http_client)
-//         .await
-//         .with_context(|| "Failed to get access token from Strava.")?;
-
-//     let token = read_token().with_context(|| "Failed to read Strava access token.")?;
-
-//     let athlete = Athlete::get_current(&token)
-//         .await
-//         .with_context(|| "Failed to get athlete from Strava.")?;
-
-//     println!("{:?}", athlete);
-
-//     let activities = Activity::athlete_activities(&token)
-//         .await
-//         .with_context(|| "Failed to get activities from Strava.")?;
-
-//     println!("{:?}", activities);
-
-//     Ok(())
-// }
-
-// fn read_token() -> Result<AccessToken> {
-//     Ok(AccessToken::new(
-//         fs::read_to_string(
-//             Path::new(&env::var("HOME")?)
-//                 .join(".segmentor")
-//                 .join("access-token"),
-//         )?
-//         .trim()
-//         .to_string(),
-//     ))
-// }
-
+use anyhow::{Context, Result};
 use axum::{
     extract::{Extension, Query},
-    http::{Request, StatusCode},
+    http::StatusCode,
     response::{IntoResponse, Redirect, Response},
     routing::{get, get_service, post},
     Json, Router,
 };
 use oauth2::{
-    basic::BasicClient, reqwest::async_http_client, url::ParseError, AuthUrl, AuthorizationCode,
-    Client, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl,
+    basic::BasicClient, url::ParseError, AuthUrl, ClientId, ClientSecret, CsrfToken, RedirectUrl,
     Scope, TokenUrl,
 };
 use serde::{Deserialize, Serialize};
@@ -94,7 +22,7 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{debug, Level};
-use tracing_subscriber::{EnvFilter, FmtSubscriber};
+use tracing_subscriber::FmtSubscriber;
 
 struct State {
     environment: Environment,
@@ -103,13 +31,13 @@ struct State {
 #[derive(Debug, Deserialize)]
 struct StravaAuth {
     access_token: String,
-    athlete: Athlete,
-    expires_at: usize,
+    _athlete: Athlete,
+    _expires_at: usize,
     refresh_token: String,
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     // initialize tracing
     let subscriber = FmtSubscriber::builder()
         // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
@@ -122,7 +50,6 @@ async fn main() {
 
     let environment = get_environment();
 
-    let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
     let shared_state = Arc::new(State { environment });
 
     let static_path = get_static_path(environment);
@@ -166,7 +93,9 @@ async fn main() {
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
-        .unwrap();
+        .with_context(|| "Failed to start server.")?;
+
+    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -176,14 +105,10 @@ struct AuthParams {
     scope: String,
 }
 
-async fn callback(
-    Extension(state): Extension<Arc<State>>,
-    auth: Query<AuthParams>,
-    cookies: Cookies,
-) -> String {
-    let oauth_state = auth.state.as_str();
+async fn callback(auth: Query<AuthParams>, cookies: Cookies) -> String {
+    let _oauth_state = auth.state.as_str();
     let code = auth.code.as_str();
-    let scope = auth.scope.as_str();
+    let _scope = auth.scope.as_str();
 
     let client = reqwest::Client::new();
     let params = [
@@ -197,16 +122,8 @@ async fn callback(
         .send()
         .await;
 
-    // let token_result = create_oauth_client(state.environment)
-    //     .exchange_code(AuthorizationCode::new(auth.code.clone()))
-    //     // Set the PKCE code verifier.
-    //     //.set_pkce_verifier(state.clone().pkce_verifier)
-    //     .request_async(async_http_client)
-    //     .await;
-
     match token_result {
         Ok(response) => {
-            // let body = response.json::<StravaAuth>().await.unwrap();
             let data = response.json::<StravaAuth>().await;
 
             match data {
@@ -231,7 +148,7 @@ async fn callback(
 }
 
 async fn login(Extension(state): Extension<Arc<State>>) -> Result<Redirect, AppError> {
-    let (auth_url, csrf_token) = create_oauth_client(state.environment)
+    let (auth_url, _csrf_token) = create_oauth_client(state.environment)
         .authorize_url(CsrfToken::new_random)
         // Set the desired scopes.
         .add_scope(Scope::new("read".to_string()))
@@ -239,11 +156,13 @@ async fn login(Extension(state): Extension<Arc<State>>) -> Result<Redirect, AppE
         //.set_pkce_challenge(state.pkce_challenge)
         .url();
 
-    Ok(Redirect::permanent(to_axum_url(auth_url)))
+    Ok(Redirect::permanent(to_axum_url(auth_url)?))
 }
 
-fn to_axum_url(url: oauth2::url::Url) -> axum::http::Uri {
-    url.to_string().parse().unwrap()
+fn to_axum_url(url: oauth2::url::Url) -> Result<axum::http::Uri> {
+    url.to_string()
+        .parse()
+        .with_context(|| "Failed to parse URL.")
 }
 
 async fn create_user(
@@ -276,9 +195,8 @@ struct User {
 }
 
 enum AppError {
-    /// Something went wrong when calling the user repo.
-    UserRepo(UserRepoError),
     OAuthParse(ParseError),
+    UnexpectedError(anyhow::Error),
 }
 
 #[derive(Debug)]
@@ -291,21 +209,24 @@ enum UserRepoError {
 
 impl From<ParseError> for AppError {
     fn from(inner: ParseError) -> Self {
-        AppError::OAuthParse(inner)
+        Self::OAuthParse(inner)
+    }
+}
+
+impl From<anyhow::Error> for AppError {
+    fn from(err: anyhow::Error) -> Self {
+        Self::UnexpectedError(err)
     }
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
-            AppError::UserRepo(UserRepoError::NotFound) => {
-                (StatusCode::NOT_FOUND, "User not found")
-            }
-            AppError::UserRepo(UserRepoError::InvalidUsername) => {
-                (StatusCode::UNPROCESSABLE_ENTITY, "Invalid username")
-            }
-            AppError::OAuthParse(err) => {
+            AppError::OAuthParse(_err) => {
                 (StatusCode::INTERNAL_SERVER_ERROR, "OAuth2 parsing failure")
+            }
+            AppError::UnexpectedError(_err) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error")
             }
         };
 
