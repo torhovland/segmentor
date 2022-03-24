@@ -73,6 +73,7 @@ extern crate strava;
 // }
 
 use axum::{
+    extract::Query,
     http::StatusCode,
     response::{IntoResponse, Redirect, Response},
     routing::{get, get_service, post},
@@ -152,8 +153,18 @@ async fn main() {
         .unwrap();
 }
 
-async fn callback() -> &'static str {
-    "Hello, World!"
+#[derive(Deserialize)]
+struct AuthParams {
+    state: String,
+    code: String,
+    scope: String,
+}
+
+async fn callback(auth: Query<AuthParams>) -> String {
+    let state = auth.state.as_str();
+    let code = auth.code.as_str();
+    let scope = auth.scope.as_str();
+    format!("Hello, World! state = {state}, code = {code}, scope = {scope}")
 }
 
 async fn login() -> Result<Redirect, AppError> {
