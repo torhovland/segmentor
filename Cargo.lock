@@ -946,6 +946,7 @@ dependencies = [
  "anyhow",
  "axum",
  "oauth2",
+ "reqwest",
  "serde",
  "serde_json",
  "strava",

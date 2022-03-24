@@ -73,25 +73,30 @@ extern crate strava;
 // }
 
 use axum::{
-    extract::Query,
-    http::StatusCode,
+    extract::{Extension, Query},
+    http::{Request, StatusCode},
     response::{IntoResponse, Redirect, Response},
     routing::{get, get_service, post},
     Json, Router,
 };
 use oauth2::{
-    basic::BasicClient, url::ParseError, AuthUrl, ClientId, ClientSecret, CsrfToken,
-    PkceCodeChallenge, RedirectUrl, Scope, TokenUrl,
+    basic::BasicClient, reqwest::async_http_client, url::ParseError, AuthUrl, AuthorizationCode,
+    Client, ClientId, ClientSecret, CsrfToken, PkceCodeChallenge, PkceCodeVerifier, RedirectUrl,
+    Scope, TokenUrl,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{env, net::SocketAddr};
+use std::{env, net::SocketAddr, sync::Arc};
 use tower_http::{
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
 };
 use tracing::{debug, Level};
-use tracing_subscriber::FmtSubscriber;
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
+
+struct State {
+    environment: Environment,
+}
 
 #[tokio::main]
 async fn main() {
@@ -107,11 +112,10 @@ async fn main() {
 
     let environment = get_environment();
 
-    let static_path = match environment {
-        Environment::Development => "/workspaces/segmentor/static/",
-        Environment::Production => "/usr/src/segmentor/static/",
-        _ => panic!("Undefined environment"),
-    };
+    let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
+    let shared_state = Arc::new(State { environment });
+
+    let static_path = get_static_path(environment);
 
     // build our application with a route
     let app = Router::new()
@@ -141,7 +145,8 @@ async fn main() {
         .layer(TraceLayer::new_for_http())
         .route("/callback", get(callback))
         .route("/login", get(login))
-        .route("/users", post(create_user));
+        .route("/users", post(create_user))
+        .layer(Extension(shared_state));
 
     // run our app with hyper
     // `axum::Server` is a re-export of `hyper::Server`
@@ -160,42 +165,47 @@ struct AuthParams {
     scope: String,
 }
 
-async fn callback(auth: Query<AuthParams>) -> String {
-    let state = auth.state.as_str();
+async fn callback(Extension(state): Extension<Arc<State>>, auth: Query<AuthParams>) -> String {
+    let oauth_state = auth.state.as_str();
     let code = auth.code.as_str();
     let scope = auth.scope.as_str();
-    format!("Hello, World! state = {state}, code = {code}, scope = {scope}")
+
+    let client = reqwest::Client::new();
+    let params = [
+        ("client_id", "38457"),
+        ("client_secret", "1fb09e3b762ba505e6ff0922c04ab2e0ff8bafb3"),
+        ("code", code),
+    ];
+    let token_result = client
+        .post("https://www.strava.com/oauth/token")
+        .body("the exact body that is sent")
+        .form(&params)
+        .send()
+        .await;
+
+    // let token_result = create_oauth_client(state.environment)
+    //     .exchange_code(AuthorizationCode::new(auth.code.clone()))
+    //     // Set the PKCE code verifier.
+    //     //.set_pkce_verifier(state.clone().pkce_verifier)
+    //     .request_async(async_http_client)
+    //     .await;
+
+    match token_result {
+        Ok(response) => {
+            let body = response.text().await.unwrap();
+            format!("{:?}", body)
+        }
+        Err(error) => format!("{:?}", error),
+    }
 }
 
-async fn login() -> Result<Redirect, AppError> {
-    let environment = get_environment();
-
-    let redirect_url = match environment {
-        Environment::Development => "http://localhost:8088/callback",
-        Environment::Production => "https://segmentor.hovland.xyz/callback",
-        _ => panic!("Undefined environment"),
-    };
-
-    let client = BasicClient::new(
-        ClientId::new("38457".to_string()),
-        Some(ClientSecret::new(
-            "1fb09e3b762ba505e6ff0922c04ab2e0ff8bafb3".to_string(),
-        )),
-        AuthUrl::new("https://www.strava.com/oauth/authorize".to_string())?,
-        Some(TokenUrl::new(
-            "https://www.strava.com/oauth/token".to_string(),
-        )?),
-    )
-    .set_redirect_uri(RedirectUrl::new(redirect_url.to_string())?);
-
-    let (pkce_challenge, pkce_verifier) = PkceCodeChallenge::new_random_sha256();
-
-    let (auth_url, csrf_token) = client
+async fn login(Extension(state): Extension<Arc<State>>) -> Result<Redirect, AppError> {
+    let (auth_url, csrf_token) = create_oauth_client(state.environment)
         .authorize_url(CsrfToken::new_random)
         // Set the desired scopes.
         .add_scope(Scope::new("read".to_string()))
         // Set the PKCE code challenge.
-        .set_pkce_challenge(pkce_challenge)
+        //.set_pkce_challenge(state.pkce_challenge)
         .url();
 
     Ok(Redirect::permanent(to_axum_url(auth_url)))
@@ -287,6 +297,35 @@ fn get_environment() -> Environment {
     }
 }
 
+fn create_oauth_client(environment: Environment) -> BasicClient {
+    BasicClient::new(
+        ClientId::new("38457".to_string()),
+        Some(ClientSecret::new(
+            "1fb09e3b762ba505e6ff0922c04ab2e0ff8bafb3".to_string(),
+        )),
+        AuthUrl::new("https://www.strava.com/oauth/authorize".to_string()).unwrap(),
+        Some(TokenUrl::new("https://www.strava.com/oauth/token".to_string()).unwrap()),
+    )
+    .set_redirect_uri(RedirectUrl::new(get_redirect_url(environment).to_string()).unwrap())
+}
+
+fn get_redirect_url(environment: Environment) -> &'static str {
+    match environment {
+        Environment::Development => "http://localhost:8088/callback",
+        Environment::Production => "https://segmentor.hovland.xyz/callback",
+        _ => panic!("Undefined environment"),
+    }
+}
+
+fn get_static_path(environment: Environment) -> &'static str {
+    match environment {
+        Environment::Development => "/workspaces/segmentor/static/",
+        Environment::Production => "/usr/src/segmentor/static/",
+        _ => panic!("Undefined environment"),
+    }
+}
+
+#[derive(Clone, Copy)]
 enum Environment {
     Development,
     Production,
