@@ -31,8 +31,8 @@ struct State {
 #[derive(Debug, Deserialize)]
 struct StravaAuth {
     access_token: String,
-    _athlete: Athlete,
-    _expires_at: usize,
+    athlete: Athlete,
+    expires_at: usize,
     refresh_token: String,
 }
 
@@ -105,7 +105,7 @@ struct AuthParams {
     scope: String,
 }
 
-async fn callback(auth: Query<AuthParams>, cookies: Cookies) -> String {
+async fn callback(auth: Query<AuthParams>, cookies: Cookies) -> Result<Redirect, AppError> {
     let _oauth_state = auth.state.as_str();
     let code = auth.code.as_str();
     let _scope = auth.scope.as_str();
@@ -120,31 +120,21 @@ async fn callback(auth: Query<AuthParams>, cookies: Cookies) -> String {
         .post("https://www.strava.com/oauth/token")
         .form(&params)
         .send()
-        .await;
+        .await?;
 
-    match token_result {
-        Ok(response) => {
-            let data = response.json::<StravaAuth>().await;
+    let text = token_result.text().await?;
+    debug!("Strava token result: {text}");
 
-            match data {
-                Ok(json) => {
-                    cookies.add(Cookie::new(
-                        "segmentor-access-token",
-                        json.access_token.clone(),
-                    ));
-                    cookies.add(Cookie::new(
-                        "segmentor-refresh-token",
-                        json.refresh_token.clone(),
-                    ));
-                    format!("{:?}", json)
-                }
-                Err(error) => {
-                    format!("{:?}", error)
-                }
-            }
-        }
-        Err(error) => format!("{:?}", error),
-    }
+    let json: StravaAuth = serde_json::from_str(text.as_str())?;
+
+    cookies.add(Cookie::new(
+        "segmentor-access-token",
+        json.access_token.clone(),
+    ));
+    cookies.add(Cookie::new("segmentor-refresh-token", json.refresh_token));
+
+    // format!("{:?}", json)
+    Ok(Redirect::permanent("/".parse().unwrap()))
 }
 
 async fn login(Extension(state): Extension<Arc<State>>) -> Result<Redirect, AppError> {
@@ -196,6 +186,8 @@ struct User {
 
 enum AppError {
     OAuthParse(ParseError),
+    Reqwest(reqwest::Error),
+    Json(serde_json::Error),
     UnexpectedError(anyhow::Error),
 }
 
@@ -219,15 +211,37 @@ impl From<anyhow::Error> for AppError {
     }
 }
 
+impl From<reqwest::Error> for AppError {
+    fn from(err: reqwest::Error) -> Self {
+        Self::Reqwest(err)
+    }
+}
+
+impl From<serde_json::Error> for AppError {
+    fn from(err: serde_json::Error) -> Self {
+        Self::Json(err)
+    }
+}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
-            AppError::OAuthParse(_err) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "OAuth2 parsing failure")
-            }
-            AppError::UnexpectedError(_err) => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "Unexpected error")
-            }
+            AppError::OAuthParse(_err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "OAuth2 parsing failure".to_string(),
+            ),
+            AppError::Reqwest(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("HTTP request failure: {:?}", err),
+            ),
+            AppError::Json(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("JSON serialization failure: {:?}", err),
+            ),
+            AppError::UnexpectedError(_err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Unexpected error".to_string(),
+            ),
         };
 
         let body = Json(json!({
