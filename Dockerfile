@@ -3,7 +3,7 @@ FROM rust:1.58-slim as builder
 ARG SERVICE_NAME=segmentor
 
 RUN apt-get update \
-    && apt-get install -y libssl-dev nodejs pkg-config
+    && apt-get install -y libssl-dev nodejs npm pkg-config
 
 WORKDIR /usr/src/${SERVICE_NAME}
 
