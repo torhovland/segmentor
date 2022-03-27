@@ -11,6 +11,7 @@ ADD . ./
 
 RUN cargo build --release
 
+RUN npm install --prefix frontend
 RUN npm run build --prefix frontend
 
 FROM gcr.io/distroless/cc-debian10
