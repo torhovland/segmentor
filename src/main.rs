@@ -2,7 +2,10 @@ extern crate strava;
 
 use anyhow::{Context, Result};
 use axum::{
-    extract::{Extension, Query},
+    extract::{
+        ws::{Message, WebSocket},
+        Extension, Query, WebSocketUpgrade,
+    },
     http::StatusCode,
     response::{IntoResponse, Redirect, Response},
     routing::{get, get_service, post},
@@ -84,6 +87,7 @@ async fn main() -> Result<()> {
         .route("/callback", get(callback))
         .route("/login", get(login))
         .route("/users", post(create_user))
+        .route("/sync", get(sync))
         .layer(Extension(shared_state))
         .layer(CookieManagerLayer::new());
 
@@ -162,6 +166,29 @@ fn to_axum_url(url: oauth2::url::Url) -> Result<axum::http::Uri> {
     url.to_string()
         .parse()
         .with_context(|| "Failed to parse URL.")
+}
+
+async fn sync(ws: WebSocketUpgrade) -> impl IntoResponse {
+    ws.on_upgrade(sync_socket)
+}
+
+async fn sync_socket(mut socket: WebSocket) -> Result<(), AppError> {
+    let msg = Message::Text("foo".into());
+    socket
+        .send(msg)
+        .await
+        .with_context(|| "Failed to send WS message.")?;
+    let msg = Message::Text("foo".into());
+    socket
+        .send(msg)
+        .await
+        .with_context(|| "Failed to send WS message.")?;
+    let msg = Message::Text("foo".into());
+    socket
+        .send(msg)
+        .await
+        .with_context(|| "Failed to send WS message.")?;
+    Ok(())
 }
 
 async fn create_user(
