@@ -53,19 +53,21 @@ async fn main() -> Result<()> {
     let shared_state = Arc::new(State { environment });
 
     let static_path = get_static_path(environment);
+    let environment_name = get_environment_name(environment);
 
     // build our application with a route
     let app = Router::new()
         .route(
             "/",
-            get_service(ServeFile::new(format!("{static_path}index.html"))).handle_error(
-                |error: std::io::Error| async move {
-                    (
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        format!("Unhandled internal error: {}", error),
-                    )
-                },
-            ),
+            get_service(ServeFile::new(format!(
+                "{static_path}index-{environment_name}.html"
+            )))
+            .handle_error(|error: std::io::Error| async move {
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    format!("Unhandled internal error: {}", error),
+                )
+            }),
         )
         .layer(TraceLayer::new_for_http())
         .nest(
@@ -273,6 +275,14 @@ fn create_oauth_client(environment: Environment) -> BasicClient {
         Some(TokenUrl::new("https://www.strava.com/oauth/token".to_string()).unwrap()),
     )
     .set_redirect_uri(RedirectUrl::new(get_redirect_url(environment).to_string()).unwrap())
+}
+
+fn get_environment_name(environment: Environment) -> &'static str {
+    match environment {
+        Environment::Development => "development",
+        Environment::Production => "production",
+        _ => panic!("Undefined environment"),
+    }
 }
 
 fn get_redirect_url(environment: Environment) -> &'static str {
