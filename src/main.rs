@@ -134,6 +134,14 @@ async fn callback(auth: Query<AuthParams>, cookies: Cookies) -> Result<Redirect,
         json.access_token.clone(),
     ));
     cookies.add(Cookie::new("segmentor-refresh-token", json.refresh_token));
+    cookies.add(Cookie::new(
+        "segmentor-user-id",
+        format!("{}", json.athlete.id),
+    ));
+    cookies.add(Cookie::new(
+        "segmentor-name",
+        json.athlete.firstname.unwrap_or_else(|| "unnamed".into()),
+    ));
 
     // format!("{:?}", json)
     Ok(Redirect::permanent("/".parse().unwrap()))
