@@ -21,6 +21,7 @@ ARG SERVICE_NAME=segmentor
 COPY --from=builder /usr/src/${SERVICE_NAME}/target/release/${SERVICE_NAME} /usr/local/bin/${SERVICE_NAME}
 COPY --from=builder /usr/src/${SERVICE_NAME}/static /usr/src/${SERVICE_NAME}/static
 COPY --from=builder /usr/src/${SERVICE_NAME}/frontend/build/static /usr/src/${SERVICE_NAME}/static
+COPY --from=builder /usr/src/${SERVICE_NAME}/frontend/build /usr/src/${SERVICE_NAME}/static
 
 ENV ENVIRONMENT=production
 

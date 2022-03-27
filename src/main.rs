@@ -53,21 +53,20 @@ async fn main() -> Result<()> {
     let shared_state = Arc::new(State { environment });
 
     let static_path = get_static_path(environment);
-    let environment_name = get_environment_name(environment);
+    let html_file_name = get_html_file_name(environment);
 
     // build our application with a route
     let app = Router::new()
         .route(
             "/",
-            get_service(ServeFile::new(format!(
-                "{static_path}index-{environment_name}.html"
-            )))
-            .handle_error(|error: std::io::Error| async move {
-                (
-                    StatusCode::INTERNAL_SERVER_ERROR,
-                    format!("Unhandled internal error: {}", error),
-                )
-            }),
+            get_service(ServeFile::new(format!("{static_path}{html_file_name}"))).handle_error(
+                |error: std::io::Error| async move {
+                    (
+                        StatusCode::INTERNAL_SERVER_ERROR,
+                        format!("Unhandled internal error: {}", error),
+                    )
+                },
+            ),
         )
         .layer(TraceLayer::new_for_http())
         .nest(
@@ -285,10 +284,10 @@ fn create_oauth_client(environment: Environment) -> BasicClient {
     .set_redirect_uri(RedirectUrl::new(get_redirect_url(environment).to_string()).unwrap())
 }
 
-fn get_environment_name(environment: Environment) -> &'static str {
+fn get_html_file_name(environment: Environment) -> &'static str {
     match environment {
-        Environment::Development => "development",
-        Environment::Production => "production",
+        Environment::Development => "index-development.html",
+        Environment::Production => "index.html",
         _ => panic!("Undefined environment"),
     }
 }
