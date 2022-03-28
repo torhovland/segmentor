@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { getCookie } from "./cookies";
 import { useBaseName, useEnvironment } from "./hooks";
 
 type SyncState = "Idle" | "Syncing" | "Complete";
@@ -9,7 +10,7 @@ export default function Sync() {
     const [count, setCount] = useState(0);
     const [syncState, setSyncState] = useState("Idle" as SyncState);
     const socketUrl = `${environment === "Development" ? "ws" : "wss"}://${baseName}/sync`;
-    let socket = null;
+    let socket: WebSocket | null = null;
 
     useEffect(() => {
         let i = count;
@@ -19,12 +20,18 @@ export default function Sync() {
             setSyncState("Syncing");
             socket = new WebSocket(socketUrl);
 
-            socket.onmessage = function (event) {
+            socket.onopen = (event) => {
+                console.log(event);
+                socket!.send(getCookie("segmentor-access-token"));
+                socket!.send(getCookie("segmentor-refresh-token"));
+            };
+
+            socket.onmessage = (event) => {
                 console.log(event.data);
                 i++;
                 setCount(i);
                 if (i >= 3) setSyncState("Complete");
-            }
+            };
         }
     });
 

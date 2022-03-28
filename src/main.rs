@@ -110,6 +110,12 @@ struct AuthParams {
     scope: String,
 }
 
+#[derive(Deserialize)]
+struct Tokens {
+    access_token: String,
+    refresh_token: String,
+}
+
 async fn callback(auth: Query<AuthParams>, cookies: Cookies) -> Result<Redirect, AppError> {
     let _oauth_state = auth.state.as_str();
     let code = auth.code.as_str();
@@ -172,18 +178,36 @@ async fn sync(ws: WebSocketUpgrade) -> impl IntoResponse {
     ws.on_upgrade(sync_socket)
 }
 
+async fn receive_message(socket: &mut WebSocket) -> Result<String, AppError> {
+    if let Some(msg) = socket.recv().await {
+        if let Ok(msg) = msg {
+            match msg {
+                Message::Text(t) => {
+                    debug!("client send str: {:?}", t);
+                    Ok(t)
+                }
+                _ => Err(AppError::WebSocket("Unexpected websocket message.".into())),
+            }
+        } else {
+            Err(AppError::WebSocket("Client disconnected.".into()))
+        }
+    } else {
+        Err(AppError::WebSocket(
+            "Did not receive data from client.".into(),
+        ))
+    }
+}
+
 async fn sync_socket(mut socket: WebSocket) -> Result<(), AppError> {
-    let msg = Message::Text("foo".into());
+    let access_token = receive_message(&mut socket).await?;
+    let refresh_token = receive_message(&mut socket).await?;
+
+    let msg = Message::Text(access_token);
     socket
         .send(msg)
         .await
         .with_context(|| "Failed to send WS message.")?;
-    let msg = Message::Text("foo".into());
-    socket
-        .send(msg)
-        .await
-        .with_context(|| "Failed to send WS message.")?;
-    let msg = Message::Text("foo".into());
+    let msg = Message::Text(refresh_token);
     socket
         .send(msg)
         .await
@@ -224,6 +248,7 @@ enum AppError {
     OAuthParse(ParseError),
     Reqwest(reqwest::Error),
     Json(serde_json::Error),
+    WebSocket(String),
     UnexpectedError(anyhow::Error),
 }
 
@@ -273,6 +298,10 @@ impl IntoResponse for AppError {
             AppError::Json(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("JSON serialization failure: {:?}", err),
+            ),
+            AppError::WebSocket(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("WebSocket failure: {:?}", err),
             ),
             AppError::UnexpectedError(_err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
