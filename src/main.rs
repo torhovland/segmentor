@@ -199,15 +199,21 @@ async fn receive_message(socket: &mut WebSocket) -> Result<String, AppError> {
 }
 
 async fn sync_socket(mut socket: WebSocket) -> Result<(), AppError> {
-    let access_token = receive_message(&mut socket).await?;
-    let refresh_token = receive_message(&mut socket).await?;
+    let access_token_string = receive_message(&mut socket).await?;
+    let refresh_token_string = receive_message(&mut socket).await?;
 
-    let msg = Message::Text(access_token);
+    debug!("Make Strava access token.");
+    let access_token = strava::api::AccessToken::new(access_token_string.clone());
+    debug!("Loading activities from Strava.");
+    let activities = strava::activities::Activity::athlete_activities(&access_token).await?;
+    debug!("Finished loading activities from Strava.");
+
+    let msg = Message::Text(access_token_string);
     socket
         .send(msg)
         .await
         .with_context(|| "Failed to send WS message.")?;
-    let msg = Message::Text(refresh_token);
+    let msg = Message::Text(refresh_token_string);
     socket
         .send(msg)
         .await
@@ -249,6 +255,7 @@ enum AppError {
     Reqwest(reqwest::Error),
     Json(serde_json::Error),
     WebSocket(String),
+    Strava(strava::error::ApiError),
     UnexpectedError(anyhow::Error),
 }
 
@@ -284,6 +291,12 @@ impl From<serde_json::Error> for AppError {
     }
 }
 
+impl From<strava::error::ApiError> for AppError {
+    fn from(err: strava::error::ApiError) -> Self {
+        Self::Strava(err)
+    }
+}
+
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
         let (status, error_message) = match self {
@@ -302,6 +315,10 @@ impl IntoResponse for AppError {
             AppError::WebSocket(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("WebSocket failure: {:?}", err),
+            ),
+            AppError::Strava(err) => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("Strava API failure: {:?}", err),
             ),
             AppError::UnexpectedError(_err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
