@@ -24,7 +24,7 @@ use tower_http::{
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
 };
-use tracing::{debug, Level};
+use tracing::{debug, error, Level};
 use tracing_subscriber::FmtSubscriber;
 
 struct State {
@@ -160,7 +160,7 @@ async fn login(Extension(state): Extension<Arc<State>>) -> Result<Redirect, AppE
     let (auth_url, _csrf_token) = create_oauth_client(state.environment)
         .authorize_url(CsrfToken::new_random)
         // Set the desired scopes.
-        .add_scope(Scope::new("read".to_string()))
+        .add_scope(Scope::new("activity:read".to_string()))
         // Set the PKCE code challenge.
         //.set_pkce_challenge(state.pkce_challenge)
         .url();
@@ -205,8 +205,16 @@ async fn sync_socket(mut socket: WebSocket) -> Result<(), AppError> {
     debug!("Make Strava access token.");
     let access_token = strava::api::AccessToken::new(access_token_string.clone());
     debug!("Loading activities from Strava.");
-    let activities = strava::activities::Activity::athlete_activities(&access_token).await?;
-    debug!("Finished loading activities from Strava.");
+    let activities = strava::activities::Activity::athlete_activities(&access_token).await;
+
+    match activities {
+        Ok(_) => {
+            debug!("Finished loading activities from Strava.");
+        }
+        Err(err) => {
+            error!("Failed getting activities from Strava: {:?}", err);
+        }
+    }
 
     let msg = Message::Text(access_token_string);
     socket
