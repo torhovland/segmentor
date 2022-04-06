@@ -42,7 +42,7 @@ in
 {
   docker = hostPkgs.dockerTools.buildLayeredImage {
     name = "gcr.io/segmentor-340421/segmentor";
-    tag = "latestfoo";
+    tag = "latest";
     contents = [ backend frontend ];
     config.Cmd = [ "/bin/segmentor" ];
     config.Env = [ "ENVIRONMENT=production" ];
