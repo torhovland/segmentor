@@ -21,6 +21,12 @@ jobs:
         with:
           nix_path: nixpkgs=channel:nixos-unstable
 
+      - name: Cache install Nix packages
+        uses: rikhuijzer/cache-install@v1
+        with:
+          key: nix-${{ hashFiles('cachepackages.nix') }}
+          nix_file: 'cachepackages.nix'
+          
       - name: Install crate2nix
         run: nix-env -i -f https://github.com/kolloch/crate2nix/tarball/master
 
