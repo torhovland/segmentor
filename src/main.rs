@@ -1,6 +1,6 @@
 extern crate strava;
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use axum::{
     extract::{
         ws::{Message, WebSocket},
@@ -17,14 +17,14 @@ use oauth2::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{env, net::SocketAddr, sync::Arc};
+use std::{env, net::SocketAddr, path::PathBuf, sync::Arc};
 use strava::athletes::Athlete;
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
 use tower_http::{
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
 };
-use tracing::{debug, error, Level};
+use tracing::{debug, error, info, Level};
 use tracing_subscriber::FmtSubscriber;
 
 struct State {
@@ -52,17 +52,18 @@ async fn main() -> Result<()> {
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
     let environment = get_environment();
+    info!("Running on environment '{:?}'.", environment);
 
     let shared_state = Arc::new(State { environment });
 
-    let static_path = get_static_path(environment);
+    let static_path = get_static_path(environment)?;
     let html_file_name = get_html_file_name(environment);
 
     // build our application with a route
     let app = Router::new()
         .route(
             "/",
-            get_service(ServeFile::new(format!("{static_path}{html_file_name}"))).handle_error(
+            get_service(ServeFile::new(static_path.join(html_file_name))).handle_error(
                 |error: std::io::Error| async move {
                     (
                         StatusCode::INTERNAL_SERVER_ERROR,
@@ -381,15 +382,15 @@ fn get_redirect_url(environment: Environment) -> &'static str {
     }
 }
 
-fn get_static_path(environment: Environment) -> &'static str {
+fn get_static_path(environment: Environment) -> Result<PathBuf> {
     match environment {
-        Environment::Development => "/workspaces/segmentor/static/",
-        Environment::Production => "/usr/src/segmentor/static/",
-        _ => panic!("Undefined environment"),
+        Environment::Development => Ok(env::current_dir()?.join("static")),
+        Environment::Production => Ok(PathBuf::from("/usr/src/segmentor/static")),
+        _ => bail!("Undefined environment"),
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Environment {
     Development,
     Production,
