@@ -6,6 +6,9 @@ jobs:
     env:
       IMAGE_NAME: gcr.io/segmentor-340421/segmentor:latest
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
       - name: Login
         uses: google-github-actions/setup-gcloud@v0
         with:
@@ -13,14 +16,25 @@ jobs:
           service_account_email: github-actions@segmentor-340421.iam.gserviceaccount.com
           service_account_key: ${{ secrets.GCP_SA_KEY }}
 
+      - name: Install Nix
+        uses: cachix/install-nix-action@v12
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Install crate2nix
+        run: nix-env -i -f https://github.com/kolloch/crate2nix/tarball/master
+
+      - name: Run crate2nix
+        run: crate2nix generate
+
+      - name: Build
+        run: nix-build
+
       - name: Configure Docker
         run: gcloud auth configure-docker --quiet
           
-      - name: Checkout code
-        uses: actions/checkout@v2
-
-      - name: Build Docker image
-        run: docker build . -t $IMAGE_NAME
+      - name: Load Docker image
+        run: ./result | docker load
 
       - name: Push Docker image
         run: docker push $IMAGE_NAME
