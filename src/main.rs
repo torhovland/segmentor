@@ -385,7 +385,7 @@ fn get_redirect_url(environment: Environment) -> &'static str {
 fn get_static_path(environment: Environment) -> Result<PathBuf> {
     match environment {
         Environment::Development => Ok(env::current_dir()?.join("static")),
-        Environment::Production => Ok(PathBuf::from("/usr/src/segmentor/static")),
+        Environment::Production => Ok(PathBuf::from("/static")),
         _ => bail!("Undefined environment"),
     }
 }
