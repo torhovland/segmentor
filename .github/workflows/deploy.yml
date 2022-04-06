@@ -9,7 +9,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Login
+      - name: Login to GCP
         uses: google-github-actions/setup-gcloud@v0
         with:
           project_id: segmentor-340421
@@ -34,7 +34,7 @@ jobs:
         run: gcloud auth configure-docker --quiet
           
       - name: Load Docker image
-        run: ./result | docker load
+        run: docker load < ./result
 
       - name: Push Docker image
         run: docker push $IMAGE_NAME
