@@ -22,6 +22,7 @@ export default function Sync() {
 
             socket.onopen = (event) => {
                 console.log(event);
+                socket!.send(getCookie("segmentor-expires-in"));
                 socket!.send(getCookie("segmentor-access-token"));
                 socket!.send(getCookie("segmentor-refresh-token"));
             };

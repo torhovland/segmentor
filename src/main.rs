@@ -17,14 +17,20 @@ use oauth2::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{env, net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{
+    env,
+    net::SocketAddr,
+    path::PathBuf,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 use strava::athletes::Athlete;
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
 use tower_http::{
     services::{ServeDir, ServeFile},
     trace::TraceLayer,
 };
-use tracing::{debug, error, info, Level};
+use tracing::{debug, error, info};
 use tracing_subscriber::FmtSubscriber;
 
 struct State {
@@ -35,7 +41,7 @@ struct State {
 struct StravaAuth {
     access_token: String,
     athlete: Athlete,
-    expires_at: usize,
+    expires_at: u32,
     refresh_token: String,
 }
 
@@ -142,6 +148,10 @@ async fn callback(auth: Query<AuthParams>, cookies: Cookies) -> Result<Redirect,
     ));
     cookies.add(Cookie::new("segmentor-refresh-token", json.refresh_token));
     cookies.add(Cookie::new(
+        "segmentor-expires-at",
+        json.expires_at.to_string(),
+    ));
+    cookies.add(Cookie::new(
         "segmentor-user-id",
         format!("{}", json.athlete.id),
     ));
@@ -176,7 +186,7 @@ async fn sync(ws: WebSocketUpgrade) -> impl IntoResponse {
     ws.on_upgrade(sync_socket)
 }
 
-async fn receive_message(socket: &mut WebSocket) -> Result<String, AppError> {
+async fn receive_message(socket: &mut WebSocket) -> Result<String> {
     if let Some(msg) = socket.recv().await {
         if let Ok(msg) = msg {
             match msg {
@@ -184,21 +194,63 @@ async fn receive_message(socket: &mut WebSocket) -> Result<String, AppError> {
                     debug!("client send str: {:?}", t);
                     Ok(t)
                 }
-                _ => Err(AppError::WebSocket("Unexpected websocket message.".into())),
+                _ => {
+                    let error = "Unexpected websocket message.";
+                    send(socket, &error).await;
+                    error!(error);
+                    bail!(error)
+                }
             }
         } else {
-            Err(AppError::WebSocket("Client disconnected.".into()))
+            let error = "Client disconnected.";
+            error!(error);
+            bail!(error)
         }
     } else {
-        Err(AppError::WebSocket(
-            "Did not receive data from client.".into(),
-        ))
+        let error = "Did not receive data from client.";
+        error!(error);
+        bail!(error)
     }
 }
 
-async fn sync_socket(mut socket: WebSocket) -> Result<(), AppError> {
+async fn send(socket: &mut WebSocket, text: &str) {
+    let msg = Message::Text(text.to_string());
+    debug!("Sending to client: {:?}", msg);
+    socket
+        .send(msg)
+        .await
+        .with_context(|| "Failed to send WS message.")
+        .unwrap_or_else(|err| error!("{}", err));
+}
+
+async fn sync_socket(mut socket: WebSocket) -> Result<()> {
+    debug!("Receiving expiration from frontend.");
+    let expires_in_string = receive_message(&mut socket).await?;
+    debug!("Receiving access token from frontend.");
     let access_token_string = receive_message(&mut socket).await?;
+    debug!("Receiving refresh token from frontend.");
     let refresh_token_string = receive_message(&mut socket).await?;
+    debug!("Receiving all data from frontend.");
+
+    let expires_in = match expires_in_string
+        .parse::<u64>()
+        .with_context(|| "Strava expiration is not UNIX time.")
+    {
+        Ok(u) => u,
+        Err(err) => {
+            send(&mut socket, &err.to_string()).await;
+            return Ok(());
+        }
+    };
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    if expires_in < (now + 10 * 60) {
+        error!("Access token has expired.");
+    }
 
     debug!("Make Strava access token.");
     let access_token = strava::api::AccessToken::new(access_token_string.clone());
@@ -214,16 +266,8 @@ async fn sync_socket(mut socket: WebSocket) -> Result<(), AppError> {
         }
     }
 
-    let msg = Message::Text(access_token_string);
-    socket
-        .send(msg)
-        .await
-        .with_context(|| "Failed to send WS message.")?;
-    let msg = Message::Text(refresh_token_string);
-    socket
-        .send(msg)
-        .await
-        .with_context(|| "Failed to send WS message.")?;
+    send(&mut socket, &access_token_string[..]).await;
+    send(&mut socket, &refresh_token_string[..]).await;
     Ok(())
 }
 
@@ -260,7 +304,6 @@ enum AppError {
     OAuthParse(ParseError),
     Reqwest(reqwest::Error),
     Json(serde_json::Error),
-    WebSocket(String),
     Strava(strava::error::ApiError),
     UnexpectedError(anyhow::Error),
 }
@@ -317,10 +360,6 @@ impl IntoResponse for AppError {
             AppError::Json(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("JSON serialization failure: {:?}", err),
-            ),
-            AppError::WebSocket(err) => (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                format!("WebSocket failure: {:?}", err),
             ),
             AppError::Strava(err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
