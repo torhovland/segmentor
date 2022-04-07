@@ -128,6 +128,7 @@ async fn callback(auth: Query<AuthParams>, cookies: Cookies) -> Result<Redirect,
         ("client_secret", "1fb09e3b762ba505e6ff0922c04ab2e0ff8bafb3"),
         ("code", code),
     ];
+    debug!("Getting Strava token using {:?}", params);
     let token_result = client
         .post("https://www.strava.com/oauth/token")
         .form(&params)
