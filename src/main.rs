@@ -161,7 +161,7 @@ async fn callback(auth: Query<AuthParams>, cookies: Cookies) -> Result<Redirect,
     ));
 
     // format!("{:?}", json)
-    Ok(Redirect::permanent("/".parse().unwrap()))
+    Ok(Redirect::permanent("/"))
 }
 
 async fn login(Extension(state): Extension<Arc<State>>) -> Result<Redirect, AppError> {
@@ -173,17 +173,70 @@ async fn login(Extension(state): Extension<Arc<State>>) -> Result<Redirect, AppE
         //.set_pkce_challenge(state.pkce_challenge)
         .url();
 
-    Ok(Redirect::permanent(to_axum_url(auth_url)?))
-}
-
-fn to_axum_url(url: oauth2::url::Url) -> Result<axum::http::Uri> {
-    url.to_string()
-        .parse()
-        .with_context(|| "Failed to parse URL.")
+    Ok(Redirect::permanent(auth_url.as_str()))
 }
 
 async fn sync(ws: WebSocketUpgrade) -> impl IntoResponse {
     ws.on_upgrade(sync_socket)
+}
+
+async fn sync_socket(mut socket: WebSocket) {
+    debug!("Receiving expiration from frontend.");
+    let expires_in_string = match receive_message(&mut socket).await {
+        Ok(result) => result,
+        Err(_) => return,
+    };
+
+    debug!("Receiving access token from frontend.");
+    let access_token_string = match receive_message(&mut socket).await {
+        Ok(result) => result,
+        Err(_) => return,
+    };
+
+    debug!("Receiving refresh token from frontend.");
+    let refresh_token_string = match receive_message(&mut socket).await {
+        Ok(result) => result,
+        Err(_) => return,
+    };
+
+    debug!("Receiving all data from frontend.");
+
+    let expires_in = match expires_in_string
+        .parse::<u64>()
+        .with_context(|| "Strava expiration is not UNIX time.")
+    {
+        Ok(u) => u,
+        Err(err) => {
+            send(&mut socket, &err.to_string()).await;
+            return;
+        }
+    };
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    if expires_in < (now + 10 * 60) {
+        error!("Access token has expired.");
+    }
+
+    debug!("Make Strava access token.");
+    let access_token = strava::api::AccessToken::new(access_token_string.clone());
+    debug!("Loading activities from Strava.");
+    let activities = strava::activities::Activity::athlete_activities(&access_token).await;
+
+    match activities {
+        Ok(_) => {
+            debug!("Finished loading activities from Strava.");
+        }
+        Err(err) => {
+            error!("Failed getting activities from Strava: {:?}", err);
+        }
+    }
+
+    send(&mut socket, &access_token_string[..]).await;
+    send(&mut socket, &refresh_token_string[..]).await;
 }
 
 async fn receive_message(socket: &mut WebSocket) -> Result<String> {
@@ -221,54 +274,6 @@ async fn send(socket: &mut WebSocket, text: &str) {
         .await
         .with_context(|| "Failed to send WS message.")
         .unwrap_or_else(|err| error!("{}", err));
-}
-
-async fn sync_socket(mut socket: WebSocket) -> Result<()> {
-    debug!("Receiving expiration from frontend.");
-    let expires_in_string = receive_message(&mut socket).await?;
-    debug!("Receiving access token from frontend.");
-    let access_token_string = receive_message(&mut socket).await?;
-    debug!("Receiving refresh token from frontend.");
-    let refresh_token_string = receive_message(&mut socket).await?;
-    debug!("Receiving all data from frontend.");
-
-    let expires_in = match expires_in_string
-        .parse::<u64>()
-        .with_context(|| "Strava expiration is not UNIX time.")
-    {
-        Ok(u) => u,
-        Err(err) => {
-            send(&mut socket, &err.to_string()).await;
-            return Ok(());
-        }
-    };
-
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-
-    if expires_in < (now + 10 * 60) {
-        error!("Access token has expired.");
-    }
-
-    debug!("Make Strava access token.");
-    let access_token = strava::api::AccessToken::new(access_token_string.clone());
-    debug!("Loading activities from Strava.");
-    let activities = strava::activities::Activity::athlete_activities(&access_token).await;
-
-    match activities {
-        Ok(_) => {
-            debug!("Finished loading activities from Strava.");
-        }
-        Err(err) => {
-            error!("Failed getting activities from Strava: {:?}", err);
-        }
-    }
-
-    send(&mut socket, &access_token_string[..]).await;
-    send(&mut socket, &refresh_token_string[..]).await;
-    Ok(())
 }
 
 async fn create_user(
