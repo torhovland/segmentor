@@ -3,6 +3,7 @@ pkgs.mkShell {
   buildInputs = with pkgs; [ 
     rustc 
     cargo 
+    cargo-edit
     cargo-watch
     gcc 
     rustfmt 
