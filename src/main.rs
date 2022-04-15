@@ -37,6 +37,25 @@ struct State {
     environment: Environment,
 }
 
+#[derive(Serialize)]
+struct SocketError {
+    error: String,
+}
+
+impl SocketError {
+    fn new(message: &str) -> Self {
+        SocketError {
+            error: message.to_string(),
+        }
+    }
+}
+
+impl From<SocketError> for String {
+    fn from(error: SocketError) -> String {
+        serde_json::to_string(&error).unwrap()
+    }
+}
+
 #[derive(Debug, Deserialize)]
 struct StravaAuth {
     access_token: String,
@@ -207,7 +226,7 @@ async fn sync_socket(mut socket: WebSocket) {
     {
         Ok(u) => u,
         Err(err) => {
-            send(&mut socket, &err.to_string()).await;
+            send_error(&mut socket, &err.to_string()).await;
             return;
         }
     };
@@ -274,6 +293,12 @@ async fn send(socket: &mut WebSocket, text: &str) {
         .await
         .with_context(|| "Failed to send WS message.")
         .unwrap_or_else(|err| error!("{}", err));
+}
+
+async fn send_error(socket: &mut WebSocket, text: &str) {
+    let error = SocketError::new(text);
+    let s: String = error.into();
+    send(socket, s.as_str()).await;
 }
 
 async fn create_user(

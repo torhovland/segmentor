@@ -4,13 +4,25 @@ import { useBaseName, useEnvironment } from "./hooks";
 
 type SyncState = "Idle" | "Syncing" | "Complete";
 
+type SocketMessage = {
+    error: string
+}
+
+type SocketEvent = {
+    data: string;
+}
+
 export default function Sync() {
     const environment = useEnvironment();
     const baseName = useBaseName();
     const [count, setCount] = useState(0);
+    const [error, setError] = useState(null as string | null);
     const [syncState, setSyncState] = useState("Idle" as SyncState);
     const socketUrl = `${environment === "Development" ? "ws" : "wss"}://${baseName}/sync`;
     let socket: WebSocket | null = null;
+
+    let getMessage = (event: SocketEvent) => JSON.parse(event.data) as SocketMessage;
+    let isError = (message: SocketMessage) => message.error.length > 0;
 
     useEffect(() => {
         let i = count;
@@ -27,14 +39,23 @@ export default function Sync() {
                 socket!.send(getCookie("segmentor-refresh-token"));
             };
 
-            socket.onmessage = (event) => {
-                console.log(event.data);
-                i++;
-                setCount(i);
-                if (i >= 3) setSyncState("Complete");
+            socket.onmessage = (event: SocketEvent) => {
+                let message = getMessage(event);
+
+                if (isError(message))
+                    setError(message.error);
+                else {
+                    console.log(message);
+                    i++;
+                    setCount(i);
+                    if (i >= 3) setSyncState("Complete");
+                }
             };
         }
     });
 
-    return <section>Count: {count}</section>
+    return <>
+        {error && <section>Error: {error}</section>}
+        <section>Count: {count}</section>
+    </>;
 }
