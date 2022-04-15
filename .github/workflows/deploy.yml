@@ -16,7 +16,8 @@ jobs:
           service_account_email: github-actions@segmentor-340421.iam.gserviceaccount.com
           service_account_key: ${{ secrets.GCP_SA_KEY }}
 
-      - run: |
+      - name: Create Nix dir
+        run: |
           # Create with liberal rights, otherwise cache action will complain
           # about permission errors.
           sudo mkdir -p /nix/store
