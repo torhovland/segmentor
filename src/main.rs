@@ -42,17 +42,21 @@ struct SocketError {
     error: String,
 }
 
-impl SocketError {
-    fn new(message: &str) -> Self {
-        SocketError {
-            error: message.to_string(),
-        }
-    }
-}
-
 impl From<SocketError> for String {
     fn from(error: SocketError) -> String {
         serde_json::to_string(&error).unwrap()
+    }
+}
+
+#[derive(Serialize)]
+enum SocketMessage {
+    Error(String),
+    Foo(String),
+}
+
+impl From<SocketMessage> for String {
+    fn from(message: SocketMessage) -> String {
+        serde_json::to_string(&message).unwrap()
     }
 }
 
@@ -201,7 +205,7 @@ async fn sync(ws: WebSocketUpgrade) -> impl IntoResponse {
 
 async fn sync_socket(mut socket: WebSocket) {
     debug!("Receiving expiration from frontend.");
-    let expires_in_string = match receive_message(&mut socket).await {
+    let expires_at_string = match receive_message(&mut socket).await {
         Ok(result) => result,
         Err(_) => return,
     };
@@ -220,13 +224,13 @@ async fn sync_socket(mut socket: WebSocket) {
 
     debug!("Receiving all data from frontend.");
 
-    let expires_in = match expires_in_string
+    let expires_at = match expires_at_string
         .parse::<u64>()
         .with_context(|| "Strava expiration is not UNIX time.")
     {
         Ok(u) => u,
         Err(err) => {
-            send_error(&mut socket, &err.to_string()).await;
+            send(&mut socket, SocketMessage::Error(err.to_string())).await;
             return;
         }
     };
@@ -236,7 +240,7 @@ async fn sync_socket(mut socket: WebSocket) {
         .unwrap()
         .as_secs();
 
-    if expires_in < (now + 10 * 60) {
+    if expires_at < (now + 10 * 60) {
         error!("Access token has expired.");
     }
 
@@ -254,8 +258,8 @@ async fn sync_socket(mut socket: WebSocket) {
         }
     }
 
-    send(&mut socket, &access_token_string[..]).await;
-    send(&mut socket, &refresh_token_string[..]).await;
+    send(&mut socket, SocketMessage::Foo(access_token_string)).await;
+    send(&mut socket, SocketMessage::Foo(refresh_token_string)).await;
 }
 
 async fn receive_message(socket: &mut WebSocket) -> Result<String> {
@@ -268,7 +272,7 @@ async fn receive_message(socket: &mut WebSocket) -> Result<String> {
                 }
                 _ => {
                     let error = "Unexpected websocket message.";
-                    send(socket, &error).await;
+                    send(socket, SocketMessage::Error(error.to_string())).await;
                     error!(error);
                     bail!(error)
                 }
@@ -285,20 +289,15 @@ async fn receive_message(socket: &mut WebSocket) -> Result<String> {
     }
 }
 
-async fn send(socket: &mut WebSocket, text: &str) {
-    let msg = Message::Text(text.to_string());
+async fn send(socket: &mut WebSocket, message: SocketMessage) {
+    let s: String = message.into();
+    let msg = Message::Text(s.to_string());
     debug!("Sending to client: {:?}", msg);
     socket
         .send(msg)
         .await
         .with_context(|| "Failed to send WS message.")
         .unwrap_or_else(|err| error!("{}", err));
-}
-
-async fn send_error(socket: &mut WebSocket, text: &str) {
-    let error = SocketError::new(text);
-    let s: String = error.into();
-    send(socket, s.as_str()).await;
 }
 
 async fn create_user(

@@ -1,4 +1,4 @@
-type CookieName = "segmentor-access-token" | "segmentor-refresh-token" | "segmentor-expires-in" | "segmentor-name" | "segmentor-user-id"
+type CookieName = "segmentor-access-token" | "segmentor-refresh-token" | "segmentor-expires-at" | "segmentor-name" | "segmentor-user-id"
 
 export function getCookie(cname: CookieName) {
     let name = cname + "=";
