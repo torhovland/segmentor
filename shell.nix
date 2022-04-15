@@ -5,6 +5,7 @@ pkgs.mkShell {
     cargo 
     cargo-edit
     cargo-watch
+    crate2nix
     gcc 
     rustfmt 
     clippy 
