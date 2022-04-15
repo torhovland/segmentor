@@ -22,6 +22,7 @@ jobs:
           # about permission errors.
           sudo mkdir -p /nix/store
           sudo chmod -R 777 /nix
+          sudo rm -rf /nix
 
       - uses: cachix/install-nix-action@v15
         with:
