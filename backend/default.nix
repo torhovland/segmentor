@@ -1,8 +1,9 @@
-{ pkgs, sources }: 
+{ pkgs, naersk }: 
 let
-    naersk = pkgs.callPackage sources.naersk { };
+    naersk-lib = pkgs.callPackage naersk {};
 in {
-    backend = naersk.buildPackage {
+    segmentor = naersk-lib.buildPackage {
         src = ./.;
+        nativeBuildInputs = with pkgs; [ openssl pkg-config ];
     };
 }
