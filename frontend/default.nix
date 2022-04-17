@@ -32,4 +32,11 @@
             true
         '';
     };
+
+    shell = pkgs.mkShell {
+        buildInputs = with pkgs; [ 
+            yarn
+        ];
+    };
+
 }
