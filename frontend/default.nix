@@ -1,5 +1,5 @@
 { pkgs, stdenv, callPackage, nodejs, nodePackages, writeShellScriptBin }: {
-    frontend = pkgs.yarn2nix-moretea.mkYarnPackage {
+    static = pkgs.yarn2nix-moretea.mkYarnPackage {
         src = ./.;
         packageJSON = ./package.json;
         yarnLock = ./yarn.lock;
