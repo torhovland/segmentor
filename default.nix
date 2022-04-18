@@ -1,12 +1,19 @@
-{ dockerTools, writeShellScriptBin, segmentor }: {
+{ dockerTools, writeShellScriptBin, cacert, segmentor }: {
     image = dockerTools.buildLayeredImage {
         name = "gcr.io/segmentor-340421/segmentor";
         tag = "latest";
-        contents = with segmentor; [ backend.segmentor frontend.static ];
+        contents = with segmentor; [ 
+            cacert # Needed for SSL requests to Strava.
+            backend.segmentor 
+            frontend.static 
+        ];
 
         config = {
             Cmd = [ "/bin/segmentor" ];
-            Env = [ "ENVIRONMENT=production" ];
+            Env = [ 
+                "ENVIRONMENT=production" 
+                "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt" # Needed for SSL requests to Strava.
+            ];
         };
     };
 
