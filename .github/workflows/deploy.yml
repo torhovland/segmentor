@@ -18,10 +18,10 @@ jobs:
 
       - name: Create Nix store
         run: |
-        # Create with liberal rights, otherwise cache action will complain
-        # about permission errors.
-        sudo mkdir -p /nix/store
-        sudo chmod -R 777 /nix
+          # Create with liberal rights, otherwise cache action will complain
+          # about permission errors.
+          sudo mkdir -p /nix/store
+          sudo chmod -R 777 /nix
 
       - name: Cache Nix env
         uses: actions/cache@v2
