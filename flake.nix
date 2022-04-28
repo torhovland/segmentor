@@ -30,6 +30,10 @@
             propagatedNativeBuildInputs = a.propagatedNativeBuildInputs
               ++ v.propagatedNativeBuildInputs;
             shellHook = a.shellHook + "\n" + v.shellHook;
+            ENVIRONMENT = "development";
+            RUST_SRC_PATH = "${pkgs.rust.packages.stable.rustPlatform.rustLibSrc}";
+            LC_ALL = "en_US.UTF-8";
+            LC_CTYPE = "en_US.UTF-8";
           }) (pkgs.mkShell { }) envs);
 
       in rec {
