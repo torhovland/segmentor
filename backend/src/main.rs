@@ -17,7 +17,11 @@ use oauth2::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use sqlx::types::chrono::{DateTime, TimeZone, Utc};
+use sqlx::{
+    postgres::{PgConnectOptions, PgPoolOptions},
+    types::chrono::NaiveDateTime,
+};
 use std::{
     env,
     net::SocketAddr,
@@ -479,12 +483,26 @@ async fn save_activities(activities: &[strava::activities::Activity]) -> Result<
         //.connect("host=/home/tor/projects/segmentor/postgres dbname=foo user=postgres_user")
         .await?;
 
-    // Make a simple query to return the given parameter (use a question mark `?` instead of `$1` for MySQL)
-    let row: (i64,) = sqlx::query_as("SELECT $1")
-        .bind(150_i64)
-        .fetch_one(&pool)
-        .await?;
+    for activity in activities {
+        debug!(
+            "Saving activity {} - {}: {}",
+            activity.id,
+            activity.start_date_local.replace("Z", ""),
+            activity.name
+        );
 
-    info!("Database result: {}", row.0);
+        let date = DateTime::<Utc>::from_utc(
+            NaiveDateTime::parse_from_str(&activity.start_date_local.replace("Z", ""), "%FT%T")?,
+            Utc,
+        );
+
+        sqlx::query("INSERT INTO activities (id, name, time) VALUES ($1, $2, $3);")
+            .bind(activity.id)
+            .bind(&activity.name)
+            .bind(&date)
+            .execute(&pool)
+            .await?;
+    }
+
     Ok(())
 }
