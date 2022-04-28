@@ -17,6 +17,7 @@ use oauth2::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
     env,
     net::SocketAddr,
@@ -161,7 +162,7 @@ async fn callback(auth: Query<AuthParams>, cookies: Cookies) -> Result<Redirect,
         .await?;
 
     let text = token_result.text().await?;
-    debug!("Strava token result: {text}");
+    debug!("Strava token result: {}", text);
 
     let json: StravaAuth = serde_json::from_str(text.as_str())?;
 
@@ -250,8 +251,11 @@ async fn sync_socket(mut socket: WebSocket) {
     let activities = strava::activities::Activity::athlete_activities(&access_token).await;
 
     match activities {
-        Ok(_) => {
+        Ok(activities) => {
             debug!("Finished loading activities from Strava.");
+            save_activities(&activities)
+                .await
+                .expect("saving activities");
         }
         Err(err) => {
             error!("Failed getting activities from Strava: {:?}", err);
@@ -460,4 +464,27 @@ enum Environment {
     Development,
     Production,
     Undefined,
+}
+
+async fn save_activities(activities: &[strava::activities::Activity]) -> Result<()> {
+    let conn = PgConnectOptions::new()
+        .host("/home/tor/projects/segmentor/postgres")
+        .database("my_postgres_db")
+        .username("postgres_user")
+        .password("password");
+
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect_with(conn)
+        //.connect("host=/home/tor/projects/segmentor/postgres dbname=foo user=postgres_user")
+        .await?;
+
+    // Make a simple query to return the given parameter (use a question mark `?` instead of `$1` for MySQL)
+    let row: (i64,) = sqlx::query_as("SELECT $1")
+        .bind(150_i64)
+        .fetch_one(&pool)
+        .await?;
+
+    info!("Database result: {}", row.0);
+    Ok(())
 }
