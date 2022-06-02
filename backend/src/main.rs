@@ -231,7 +231,7 @@ async fn sync_socket(mut socket: WebSocket) {
 
     let expires_at = match expires_at_string
         .parse::<u64>()
-        .with_context(|| "Strava expiration is not UNIX time.")
+        .with_context(|| format!("Strava expiration ('{}') is not UNIX time.", expires_at_string))
     {
         Ok(u) => u,
         Err(err) => {
