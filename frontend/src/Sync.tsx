@@ -29,7 +29,7 @@ export default function Sync() {
     useEffect(() => {
         let i = count;
 
-        if (syncState === "Idle") {
+        if (syncState === "Idle" && getCookie("segmentor-expires-at")) {
             console.log("Initialising web socket.");
             setSyncState("Syncing");
             socket = new WebSocket(socketUrl);
