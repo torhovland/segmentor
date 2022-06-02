@@ -3,23 +3,25 @@
     nixpkgs.url = "nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
     naersk.url = "github:nix-community/naersk";
+    rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
-  outputs = { self, nixpkgs, flake-utils, naersk }:
+  outputs = { self, nixpkgs, flake-utils, naersk, rust-overlay }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs {
-          inherit system;
-          overlays = [ overlay ];
-          config.allowUnfree = true;
-        };
-
-        overlay = (final: prev: {
+        segmentor-overlay = (final: prev: {
           segmentor = (final.callPackage ./. { } // {
             backend = final.callPackage ./backend { inherit naersk; };
             frontend = final.callPackage ./frontend { };
           });
         });
+
+        overlays = [ (import rust-overlay) segmentor-overlay ];
+
+        pkgs = import nixpkgs {
+          inherit system overlays;
+          config.allowUnfree = true;
+        };
 
         mergeEnvs = pkgs: envs:
           pkgs.mkShell (builtins.foldl' (a: v: {
@@ -36,20 +38,19 @@
             LC_CTYPE = "en_US.UTF-8";
           }) (pkgs.mkShell { }) envs);
 
-      in rec {
-        inherit overlay;
-        apps = { dev = pkgs.segmentor.dev; };
+      in with pkgs; rec {
+        apps = { dev = segmentor.dev; };
         packages = {
-          image = pkgs.segmentor.image;
-          backend = pkgs.segmentor.backend.segmentor;
-          frontend = pkgs.segmentor.frontend.static;
+          image = segmentor.image;
+          backend = segmentor.backend.segmentor;
+          frontend = segmentor.frontend.static;
         };
         defaultPackage = packages.image;
         checks = packages;
         devShell = mergeEnvs pkgs (with devShells; [ backend frontend ]);
         devShells = {
-          backend = pkgs.segmentor.backend.shell;
-          frontend = pkgs.segmentor.frontend.shell;
+          backend = segmentor.backend.shell;
+          frontend = segmentor.frontend.shell;
         };
       });
 }
