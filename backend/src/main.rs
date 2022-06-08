@@ -101,7 +101,6 @@ async fn main() -> Result<()> {
                 },
             ),
         )
-        .layer(TraceLayer::new_for_http())
         .nest(
             "/static",
             get_service(ServeDir::new(static_path)).handle_error(
@@ -113,12 +112,12 @@ async fn main() -> Result<()> {
                 },
             ),
         )
-        .layer(TraceLayer::new_for_http())
         .route("/callback", get(callback))
         .route("/login", get(login))
         .route("/users", post(create_user))
         .route("/sync", get(sync))
         .route("/activities", get(get_activities))
+        .layer(TraceLayer::new_for_http())
         .layer(Extension(shared_state))
         .layer(CookieManagerLayer::new());
 
@@ -317,29 +316,6 @@ struct Activity {
     time: DateTime<Utc>,
 }
 
-#[axum_macros::debug_handler]
-async fn get_activities() -> Result<Json<Vec<Activity>>, AppError> {
-    let conn = PgConnectOptions::new()
-        .host("/home/tor/projects/segmentor/postgres")
-        .database("my_postgres_db")
-        .username("postgres_user")
-        .password("password");
-
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect_with(conn)
-        //.connect("host=/home/tor/projects/segmentor/postgres dbname=foo user=postgres_user")
-        .await
-        .with_context(|| "Failed to create DB pool.")?;
-
-    let activities: Vec<Activity> = sqlx::query_as::<_, Activity>("SELECT * FROM activities;")
-        .fetch_all(&pool)
-        .await
-        .with_context(|| "Failed to read from database.")?;
-
-    Ok(Json(activities))
-}
-
 async fn create_user(
     // this argument tells axum to parse the request body
     // as JSON into a `CreateUser` type
@@ -528,13 +504,43 @@ async fn save_activities(activities: &[strava::activities::Activity]) -> Result<
             Utc,
         );
 
-        sqlx::query("INSERT INTO activities (id, name, time) VALUES ($1, $2, $3);")
-            .bind(activity.id)
-            .bind(&activity.name)
-            .bind(&date)
-            .execute(&pool)
-            .await?;
+        sqlx::query(
+            "INSERT INTO activities (id, name, time) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING",
+        )
+        .bind(activity.id)
+        .bind(&activity.name)
+        .bind(&date)
+        .execute(&pool)
+        .await?;
     }
 
     Ok(())
+}
+
+#[axum_macros::debug_handler]
+async fn get_activities() -> Result<Json<Vec<Activity>>, AppError> {
+    debug!("get_activities");
+
+    let conn = PgConnectOptions::new()
+        .host("/home/tor/projects/segmentor/postgres")
+        .database("my_postgres_db")
+        .username("postgres_user")
+        .password("password");
+
+    debug!("create pool");
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect_with(conn)
+        //.connect("host=/home/tor/projects/segmentor/postgres dbname=foo user=postgres_user")
+        .await
+        .with_context(|| "Failed to create DB pool.")?;
+
+    debug!("read activities");
+    let activities: Vec<Activity> = sqlx::query_as::<_, Activity>("SELECT * FROM activities;")
+        .fetch_all(&pool)
+        .await
+        .with_context(|| "Failed to read from database.")?;
+
+    debug!("return json");
+    Ok(Json(activities))
 }
