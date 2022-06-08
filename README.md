@@ -16,7 +16,7 @@ In another shell:
 ```
 nix develop
 cd backend
-ENVIRONMENT=Development cargo run # or cargo watch -x run
+ENVIRONMENT=development cargo run # or cargo watch -x run
 ```
 
 Now go to http://localhost:8088/login.
