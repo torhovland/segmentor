@@ -229,10 +229,12 @@ async fn sync_socket(mut socket: WebSocket) {
 
     debug!("Receiving all data from frontend.");
 
-    let expires_at = match expires_at_string
-        .parse::<u64>()
-        .with_context(|| format!("Strava expiration ('{}') is not UNIX time.", expires_at_string))
-    {
+    let expires_at = match expires_at_string.parse::<u64>().with_context(|| {
+        format!(
+            "Strava expiration ('{}') is not UNIX time.",
+            expires_at_string
+        )
+    }) {
         Ok(u) => u,
         Err(err) => {
             send(&mut socket, SocketMessage::Error(err.to_string())).await;
@@ -312,10 +314,11 @@ async fn send(socket: &mut WebSocket, message: SocketMessage) {
 struct Activity {
     id: u32,
     name: String,
-    time: Utc,
+    time: DateTime<Utc>,
 }
 
-async fn get_activities() -> Result<Json<Value>> {
+#[axum_macros::debug_handler]
+async fn get_activities() -> Result<Json<Vec<Activity>>, AppError> {
     let conn = PgConnectOptions::new()
         .host("/home/tor/projects/segmentor/postgres")
         .database("my_postgres_db")
@@ -326,13 +329,15 @@ async fn get_activities() -> Result<Json<Value>> {
         .max_connections(5)
         .connect_with(conn)
         //.connect("host=/home/tor/projects/segmentor/postgres dbname=foo user=postgres_user")
-        .await?;
+        .await
+        .with_context(|| "Failed to create DB pool.")?;
 
     let activities: Vec<Activity> = sqlx::query_as::<_, Activity>("SELECT * FROM activities;")
         .fetch_all(&pool)
-        .await?;
+        .await
+        .with_context(|| "Failed to read from database.")?;
 
-    Ok(Json(json!(activities)))
+    Ok(Json(activities))
 }
 
 async fn create_user(
