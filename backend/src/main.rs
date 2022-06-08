@@ -16,8 +16,8 @@ use oauth2::{
     Scope, TokenUrl,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use sqlx::types::chrono::{DateTime, TimeZone, Utc};
+use serde_json::{json, Value};
+use sqlx::types::chrono::{DateTime, Utc};
 use sqlx::{
     postgres::{PgConnectOptions, PgPoolOptions},
     types::chrono::NaiveDateTime,
@@ -29,7 +29,6 @@ use std::{
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
-use strava::athletes::Athlete;
 use tower_cookies::{Cookie, CookieManagerLayer, Cookies};
 use tower_http::{
     services::{ServeDir, ServeFile},
@@ -68,7 +67,7 @@ impl From<SocketMessage> for String {
 #[derive(Debug, Deserialize)]
 struct StravaAuth {
     access_token: String,
-    athlete: Athlete,
+    athlete: strava::athletes::Athlete,
     expires_at: u32,
     refresh_token: String,
 }
@@ -119,6 +118,7 @@ async fn main() -> Result<()> {
         .route("/login", get(login))
         .route("/users", post(create_user))
         .route("/sync", get(sync))
+        .route("/activities", get(get_activities))
         .layer(Extension(shared_state))
         .layer(CookieManagerLayer::new());
 
@@ -306,6 +306,33 @@ async fn send(socket: &mut WebSocket, message: SocketMessage) {
         .await
         .with_context(|| "Failed to send WS message.")
         .unwrap_or_else(|err| error!("{}", err));
+}
+
+#[derive(sqlx::FromRow, Serialize)]
+struct Activity {
+    id: u32,
+    name: String,
+    time: Utc,
+}
+
+async fn get_activities() -> Result<Json<Value>> {
+    let conn = PgConnectOptions::new()
+        .host("/home/tor/projects/segmentor/postgres")
+        .database("my_postgres_db")
+        .username("postgres_user")
+        .password("password");
+
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect_with(conn)
+        //.connect("host=/home/tor/projects/segmentor/postgres dbname=foo user=postgres_user")
+        .await?;
+
+    let activities: Vec<Activity> = sqlx::query_as::<_, Activity>("SELECT * FROM activities;")
+        .fetch_all(&pool)
+        .await?;
+
+    Ok(Json(json!(activities)))
 }
 
 async fn create_user(
