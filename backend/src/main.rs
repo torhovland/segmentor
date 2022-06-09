@@ -311,9 +311,9 @@ async fn send(socket: &mut WebSocket, message: SocketMessage) {
 
 #[derive(sqlx::FromRow, Serialize)]
 struct Activity {
-    id: u32,
+    id: i64,
     name: String,
-    time: DateTime<Utc>,
+    time: NaiveDateTime,
 }
 
 async fn create_user(
@@ -345,6 +345,7 @@ struct User {
     username: String,
 }
 
+#[derive(Debug)]
 enum AppError {
     OAuthParse(ParseError),
     Reqwest(reqwest::Error),
@@ -393,6 +394,8 @@ impl From<strava::error::ApiError> for AppError {
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
+        error!("AppError: {:?}", self);
+
         let (status, error_message) = match self {
             AppError::OAuthParse(_err) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
