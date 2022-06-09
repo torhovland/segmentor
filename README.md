@@ -8,7 +8,7 @@ In one shell:
 ```
 nix develop
 cd frontend
-npm start
+yarn start
 ```
 
 In another shell:
