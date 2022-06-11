@@ -484,15 +484,23 @@ enum Environment {
 async fn save_activities(activities: &[strava::activities::Activity]) -> Result<()> {
     let conn = PgConnectOptions::new()
         .host("/home/tor/projects/segmentor/postgres")
-        .database("my_postgres_db")
-        .username("postgres_user")
+        .database("postgres")
+        .username("segmentor")
         .password("password");
 
     let pool = PgPoolOptions::new()
         .max_connections(5)
         .connect_with(conn)
         //.connect("host=/home/tor/projects/segmentor/postgres dbname=foo user=postgres_user")
-        .await?;
+        .await
+        .with_context(|| "Failed to connect to database server.")?;
+
+    info!("Running migrations.");
+    sqlx::migrate!("db/migrations")
+        .run(&pool)
+        .await
+        .with_context(|| "Failed to run database migrations.")?;
+    info!("Finished running migrations.");
 
     for activity in activities {
         debug!(
@@ -507,14 +515,13 @@ async fn save_activities(activities: &[strava::activities::Activity]) -> Result<
             Utc,
         );
 
-        sqlx::query(
-            "INSERT INTO activities (id, name, time) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING",
-        )
-        .bind(activity.id)
-        .bind(&activity.name)
-        .bind(&date)
-        .execute(&pool)
-        .await?;
+        sqlx::query("INSERT INTO activities (id, name, time) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING")
+            .bind(activity.id)
+            .bind(&activity.name)
+            .bind(&date)
+            .execute(&pool)
+            .await
+            .with_context(|| "Failed to write data to database server.")?;
     }
 
     Ok(())
