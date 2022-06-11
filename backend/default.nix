@@ -8,6 +8,7 @@ in {
     };
 
     shell = pkgs.mkShell {
+        nativeBuildInputs = with pkgs; [ openssl pkg-config ];
         buildInputs = with pkgs; [ 
             (rust-bin.nightly.latest.default.override {
                 extensions = [ "rust-src" ];
@@ -33,6 +34,7 @@ in {
             initdb $PGDATA --auth=trust >/dev/null
             fi
             pg_ctl start -l $LOG_PATH -o "-c listen_addresses= -c unix_socket_directories=$PGHOST"
+            psql -c "CREATE ROLE segmentor with LOGIN ENCRYPTED PASSWORD 'password';"
         '';
     };
 }
