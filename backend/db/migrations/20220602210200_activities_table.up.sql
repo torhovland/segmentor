@@ -1,5 +1,0 @@
-CREATE TABLE IF NOT EXISTS activities (
-    id INTEGER PRIMARY KEY,
-    name VARCHAR (255) NOT NULL,
-    time TIMESTAMP NOT NULL
-);
