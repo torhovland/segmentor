@@ -1,22 +1,16 @@
-# Segmentor
-A web app for analyzing Strava segments.
+# Fresh project
 
-## Developing
+Your new Fresh project is ready to go. You can follow the Fresh "Getting
+Started" guide here: https://fresh.deno.dev/docs/getting-started
 
-In one shell:
+### Usage
 
-```
-nix develop
-cd frontend
-yarn start
-```
+Make sure to install Deno: https://deno.land/manual/getting_started/installation
 
-In another shell:
+Then start the project:
 
 ```
-nix develop
-cd backend
-ENVIRONMENT=development cargo run # or cargo watch -x run
+deno task start
 ```
 
-Now go to http://localhost:8088/login.
+This will watch the project directory and restart as necessary.
