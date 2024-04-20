@@ -1,25 +1,36 @@
-import { useSignal } from "@preact/signals";
-import Counter from "../islands/Counter.tsx";
+import type { Handlers, PageProps } from "$fresh/server.ts";
+import { oauth2Client } from "@/utils/oauth2_client.ts";
+import { redirectToOAuthLogin } from "@/utils/deno_kv_oauth.ts";
+import type { State } from "./_middleware.ts";
 
-export default function Home() {
-  const count = useSignal(3);
+interface Data {
+  name: string;
+}
+
+export const handler: Handlers<any, State> = {
+  async GET(_req, ctx) {
+    if (!ctx.state.sessionId) {
+      return redirectToOAuthLogin(oauth2Client);
+    }
+
+    const userResponse = await fetch("https://www.strava.com/api/v3/athlete", {
+      headers: {
+        Authorization: `Bearer ${ctx.state.accessToken}`,
+      },
+    });
+    const { firstname } = await userResponse.json();
+
+    return await ctx.render({ name: firstname });
+  },
+};
+
+export default function Page({ data }: PageProps<Data>) {
+  const { name } = data;
+
   return (
-    <div class="px-4 py-8 mx-auto bg-[#86efac]">
-      <div class="max-w-screen-md mx-auto flex flex-col items-center justify-center">
-        <img
-          class="my-6"
-          src="/logo.svg"
-          width="128"
-          height="128"
-          alt="the Fresh logo: a sliced lemon dripping with juice"
-        />
-        <h1 class="text-4xl font-bold">Welcome to Fresh</h1>
-        <p class="my-4">
-          Try updating this message in the
-          <code class="mx-2">./routes/index.tsx</code> file, and refresh.
-        </p>
-        <Counter count={count} />
-      </div>
-    </div>
+    <main>
+      <h1>Segmentor</h1>
+      <p>Hello, {name}!</p>
+    </main>
   );
 }
