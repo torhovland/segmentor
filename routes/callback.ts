@@ -5,7 +5,7 @@ import { State } from "./_middleware.ts";
 import { getAccessToken, setCallbackHeaders } from "@/utils/deno_kv_oauth.ts";
 import { oauth2Client } from "@/utils/oauth2_client.ts";
 
-export const handler: Handlers<any, State> = {
+export const handler: Handlers<State> = {
   async GET(req) {
     const accessToken = await getAccessToken(req, oauth2Client);
     const sessionId = crypto.randomUUID();

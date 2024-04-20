@@ -7,7 +7,7 @@ interface Data {
   name: string;
 }
 
-export const handler: Handlers<any, State> = {
+export const handler: Handlers<Data, State> = {
   async GET(_req, ctx) {
     if (!ctx.state.sessionId) {
       return redirectToOAuthLogin(oauth2Client);
